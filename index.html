@@ -7,15 +7,537 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css" />
+<style>
+:root {
+  --nfg-bg: #F5F1E8;
+  --nfg-bg-card: #FBF8F0;
+  --nfg-ink: #1A2820;
+  --nfg-ink-soft: #5C6B62;
+  --nfg-line: #DDD4BD;
+  --nfg-primary: #1F3D2B;
+  --nfg-accent: #C7522A;
+  --nfg-display: "Fraunces", Georgia, serif;
+  --nfg-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --nfg-mono: ui-monospace, "SF Mono", monospace;
+  --nfg-sidebar: 220px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--nfg-bg);
+  font-family: var(--nfg-sans);
+  color: var(--nfg-ink);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+.nfg-shell { display: flex; min-height: 100vh; }
+
+/* SIDEBAR */
+.nfg-sidebar {
+  width: var(--nfg-sidebar); flex-shrink: 0;
+  position: sticky; top: 0; height: 100vh;
+  background: var(--nfg-primary);
+  display: flex; flex-direction: column;
+  padding: 32px 0 24px; z-index: 60;
+}
+.nfg-sidebar-brand { padding: 0 24px 28px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 16px; }
+.nfg-sidebar-by { font-family: var(--nfg-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 6px; }
+.nfg-sidebar-ttl { font-family: var(--nfg-display); font-size: 22px; line-height: 1.1; font-weight: 400; letter-spacing: -0.02em; color: #fff; }
+.nfg-sidebar nav { display: flex; flex-direction: column; gap: 2px; padding: 0 12px; flex: 1; }
+.nfg-sidebar-btn {
+  display: flex; align-items: center; gap: 10px;
+  border: 0; background: transparent; color: rgba(255,255,255,0.6);
+  font-family: var(--nfg-sans); font-size: 13.5px; font-weight: 400;
+  padding: 10px 12px; border-radius: 10px; cursor: pointer;
+  text-align: left; width: 100%; transition: background 0.15s, color 0.15s; position: relative;
+}
+.nfg-sidebar-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.nfg-sidebar-btn.on { background: rgba(255,255,255,0.15); color: #fff; font-weight: 500; }
+.nfg-sidebar-badge {
+  margin-left: auto; background: var(--nfg-accent); color: #fff;
+  font-size: 10px; font-weight: 600; border-radius: 999px;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* MAIN */
+.nfg-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* HEADER */
+.nfg-hd {
+  padding: 28px 40px 20px; background: var(--nfg-bg);
+  border-bottom: 1px solid var(--nfg-line);
+  position: sticky; top: 0; z-index: 40;
+}
+.nfg-hd-top { display: flex; justify-content: space-between; align-items: center; }
+.nfg-hd-ttl { font-family: var(--nfg-display); font-size: 32px; line-height: 1; font-weight: 400; letter-spacing: -0.02em; color: var(--nfg-primary); }
+.nfg-lang { border: 1px solid var(--nfg-line); background: transparent; border-radius: 999px; padding: 6px 14px; font-family: var(--nfg-mono); font-size: 11px; color: var(--nfg-ink); cursor: pointer; }
+.nfg-search { margin-top: 16px; display: flex; align-items: center; gap: 10px; background: var(--nfg-bg-card); border: 1px solid var(--nfg-line); border-radius: 12px; padding: 10px 16px; color: var(--nfg-ink-soft); max-width: 480px; }
+.nfg-search input { flex: 1; border: 0; background: transparent; outline: none; font-family: var(--nfg-sans); font-size: 14px; color: var(--nfg-ink); }
+.nfg-clr { border: 0; background: transparent; font-size: 18px; color: var(--nfg-ink-soft); cursor: pointer; }
+
+/* TOOLBAR */
+.nfg-toolbar { padding: 16px 40px 0; background: var(--nfg-bg); border-bottom: 1px solid var(--nfg-line); }
+.nfg-cats { display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 14px; }
+.nfg-cat { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--nfg-line); background: var(--nfg-bg-card); color: var(--nfg-ink); border-radius: 999px; padding: 7px 14px; font-size: 13px; font-family: var(--nfg-sans); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.nfg-cat-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.nfg-cat.on .nfg-cat-dot { background: #fff !important; }
+.nfg-toolbar-row { display: flex; gap: 10px; padding-bottom: 12px; align-items: center; flex-wrap: wrap; }
+.nfg-select { background: var(--nfg-bg-card); border: 1px solid var(--nfg-line); border-radius: 10px; padding: 9px 12px; font-family: var(--nfg-sans); font-size: 13px; color: var(--nfg-ink); appearance: none; min-width: 180px; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231f3d2b' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; }
+.nfg-viewtoggle { display: flex; background: var(--nfg-bg-card); border: 1px solid var(--nfg-line); border-radius: 10px; padding: 2px; }
+.nfg-viewtoggle button { border: 0; background: transparent; padding: 7px 18px; font-family: var(--nfg-sans); font-size: 12px; color: var(--nfg-ink-soft); cursor: pointer; border-radius: 8px; }
+.nfg-viewtoggle button.on { background: var(--nfg-primary); color: #fff; }
+.nfg-tags { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 14px; }
+.nfg-tag { border: 1px dashed var(--nfg-line); background: transparent; border-radius: 999px; padding: 5px 12px; font-size: 12px; font-family: var(--nfg-sans); color: var(--nfg-ink-soft); cursor: pointer; }
+.nfg-tag.on { border-style: solid; border-color: var(--nfg-primary); background: var(--nfg-primary); color: #fff; }
+
+/* RESULT / GRID */
+.nfg-content { padding: 28px 40px 48px; }
+.nfg-result-head { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--nfg-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nfg-ink-soft); margin-bottom: 20px; }
+.nfg-result-head b { color: var(--nfg-ink); font-size: 14px; font-family: var(--nfg-sans); font-weight: 600; margin-right: 6px; letter-spacing: 0; text-transform: none; }
+.nfg-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+
+/* CARD */
+.nfg-card { background: var(--nfg-bg-card); border: 1px solid var(--nfg-line); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+.nfg-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(31,61,43,0.1); }
+.nfg-card.featured { border-color: var(--nfg-primary); }
+.nfg-card-img { position: relative; height: 180px; }
+.nfg-ph { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.nfg-ph.tall { height: 280px; }
+.nfg-ph-lbl { position: relative; font-family: var(--nfg-mono); font-size: 10px; letter-spacing: 0.08em; color: rgba(255,255,255,0.85); text-transform: uppercase; background: rgba(0,0,0,0.25); padding: 4px 8px; border-radius: 4px; }
+.nfg-score { position: absolute; top: 12px; left: 12px; background: var(--nfg-bg); border-radius: 10px; padding: 6px 10px; display: flex; align-items: baseline; gap: 1px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.nfg-score b { font-family: var(--nfg-display); font-size: 22px; line-height: 1; color: var(--nfg-primary); }
+.nfg-score span { font-family: var(--nfg-mono); font-size: 10px; color: var(--nfg-ink-soft); }
+.nfg-badge-top50 { position: absolute; top: 12px; left: 12px; background: var(--nfg-accent); color: #fff; font-family: var(--nfg-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 9px; border-radius: 999px; }
+.nfg-save { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border: 0; border-radius: 50%; background: rgba(255,255,255,0.95); color: var(--nfg-ink); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.nfg-save.on { color: var(--nfg-accent); }
+.nfg-card-body { padding: 16px 18px 18px; }
+.nfg-card-meta { display: flex; align-items: center; gap: 8px; font-family: var(--nfg-mono); font-size: 10.5px; letter-spacing: 0.06em; color: var(--nfg-ink-soft); text-transform: uppercase; margin-bottom: 6px; }
+.nfg-card-type { display: inline-flex; align-items: center; gap: 5px; }
+.nfg-card-type i { width: 6px; height: 6px; border-radius: 50%; }
+.nfg-card-name { font-family: var(--nfg-display); font-size: 22px; line-height: 1.1; font-weight: 400; color: var(--nfg-primary); margin: 0 0 6px; letter-spacing: -0.01em; }
+.nfg-card-short { font-size: 13px; line-height: 1.45; color: var(--nfg-ink); margin: 0 0 10px; }
+.nfg-card-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+.nfg-card-tag { font-size: 10.5px; font-family: var(--nfg-mono); letter-spacing: 0.04em; color: var(--nfg-primary); background: rgba(31,61,43,0.06); padding: 3px 8px; border-radius: 999px; }
+.nfg-empty { padding: 48px 24px; text-align: center; color: var(--nfg-ink-soft); font-size: 14px; border: 1px dashed var(--nfg-line); border-radius: 12px; grid-column: 1 / -1; }
+
+/* MAP */
+.nfg-map-section { padding: 28px 40px 48px; }
+.nfg-map-wrap { background: var(--nfg-bg-card); border: 1px solid var(--nfg-line); border-radius: 16px; padding: 20px; max-width: 860px; }
+.nfg-map { width: 100%; height: auto; display: block; }
+.nfg-map-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-family: var(--nfg-mono); font-size: 10px; letter-spacing: 0.04em; color: var(--nfg-ink-soft); text-transform: uppercase; }
+.nfg-map-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.nfg-map-legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.nfg-map-pop { margin-top: 16px; background: var(--nfg-bg-card); border: 1px solid var(--nfg-primary); border-radius: 14px; display: flex; cursor: pointer; overflow: hidden; max-width: 420px; }
+.nfg-map-pop > div:first-child { width: 110px; flex-shrink: 0; }
+.nfg-map-pop > div:last-child { padding: 14px 16px; }
+.nfg-map-pop h4 { font-family: var(--nfg-display); margin: 4px 0; font-weight: 400; font-size: 18px; color: var(--nfg-primary); }
+.nfg-map-pop p { margin: 0 0 6px; font-size: 13px; color: var(--nfg-ink); }
+.nfg-map-hint { margin-top: 12px; font-family: var(--nfg-mono); font-size: 11px; color: var(--nfg-ink-soft); }
+.nfg-link { color: var(--nfg-accent); font-size: 13px; text-decoration: none; font-weight: 500; }
+
+/* PROFILE MODAL */
+.nfg-profile { position: fixed; inset: 0; background: rgba(26,40,32,0.5); z-index: 200; display: flex; align-items: center; justify-content: center; animation: nfg-fade 0.18s ease; padding: 24px; }
+@keyframes nfg-fade { from { opacity: 0; } to { opacity: 1; } }
+.nfg-profile-sheet { width: 100%; max-width: 640px; max-height: calc(100vh - 48px); background: var(--nfg-bg); border-radius: 20px; overflow-y: auto; position: relative; animation: nfg-slide 0.22s cubic-bezier(0.2,0.8,0.2,1); }
+@keyframes nfg-slide { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.nfg-profile-sheet::-webkit-scrollbar { width: 0; }
+.nfg-profile-close { position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: rgba(255,255,255,0.95); font-size: 22px; line-height: 1; cursor: pointer; z-index: 10; color: var(--nfg-ink); }
+.nfg-profile-hero { position: relative; }
+.nfg-profile-thumbs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; padding: 4px; }
+.nfg-profile-thumbs > div { height: 72px; border-radius: 6px; overflow: hidden; }
+.nfg-profile-body { padding: 24px 28px 36px; }
+.nfg-profile-meta { display: flex; gap: 8px; align-items: center; font-family: var(--nfg-mono); font-size: 10.5px; letter-spacing: 0.06em; color: var(--nfg-ink-soft); text-transform: uppercase; margin-bottom: 8px; }
+.nfg-profile-name { font-family: var(--nfg-display); font-size: 36px; line-height: 1; font-weight: 400; color: var(--nfg-primary); margin: 0 0 12px; letter-spacing: -0.02em; }
+.nfg-profile-short { font-size: 15px; line-height: 1.55; margin: 0 0 20px; }
+.nfg-profile-score { display: flex; align-items: center; gap: 16px; background: var(--nfg-bg-card); border: 1px solid var(--nfg-line); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; }
+.nfg-profile-score-num { display: flex; align-items: baseline; }
+.nfg-profile-score-num b { font-family: var(--nfg-display); font-size: 42px; line-height: 1; color: var(--nfg-primary); }
+.nfg-profile-score-num span { font-family: var(--nfg-mono); font-size: 14px; color: var(--nfg-ink-soft); }
+.nfg-profile-score-lbl { font-size: 13px; color: var(--nfg-ink-soft); margin-bottom: 4px; }
+.nfg-top50-banner { display: flex; gap: 12px; align-items: center; background: linear-gradient(135deg, var(--nfg-accent), #b8421f); color: #fff; border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+.nfg-top50-icon { font-size: 26px; }
+.nfg-top50-banner b { display: block; font-size: 15px; }
+.nfg-top50-banner small { font-family: var(--nfg-mono); font-size: 10px; letter-spacing: 0.06em; opacity: 0.85; }
+.nfg-actions { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+.nfg-btn-primary { background: var(--nfg-primary); color: #fff; border: 0; border-radius: 10px; padding: 11px 20px; font-family: var(--nfg-sans); font-size: 14px; font-weight: 500; cursor: pointer; }
+.nfg-btn-ghost { background: transparent; border: 1px solid var(--nfg-line); color: var(--nfg-ink); border-radius: 10px; padding: 10px 16px; font-family: var(--nfg-sans); font-size: 14px; cursor: pointer; }
+.nfg-btn-ghost.on { background: var(--nfg-primary); color: #fff; border-color: var(--nfg-primary); }
+.nfg-section { margin-bottom: 24px; }
+.nfg-section-h { font-family: var(--nfg-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nfg-ink-soft); margin: 0 0 10px; font-weight: 500; }
+.nfg-criteria { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.nfg-criteria li { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.4; }
+.nfg-check { flex-shrink: 0; width: 20px; height: 20px; background: var(--nfg-primary); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+.nfg-rel { margin-bottom: 12px; }
+.nfg-rel-lbl { font-family: var(--nfg-mono); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nfg-ink-soft); margin-bottom: 6px; }
+.nfg-rel-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.nfg-rel-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--nfg-line); background: var(--nfg-bg-card); border-radius: 999px; padding: 6px 12px; font-size: 12px; font-family: var(--nfg-sans); color: var(--nfg-ink); cursor: pointer; }
+.nfg-rel-chip i { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.nfg-comment-empty { background: var(--nfg-bg-card); border: 1px dashed var(--nfg-line); border-radius: 12px; padding: 20px; text-align: center; }
+.nfg-comment-empty p { margin: 0 0 10px; font-size: 13px; color: var(--nfg-ink-soft); }
+
+/* PAGES */
+.nfg-page { padding: 40px 40px 48px; }
+.nfg-page-h { font-family: var(--nfg-display); font-size: 36px; font-weight: 400; color: var(--nfg-primary); margin: 0 0 6px; letter-spacing: -0.02em; }
+.nfg-page-sub { font-family: var(--nfg-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nfg-ink-soft); margin: 0 0 24px; }
+.nfg-login-hint { font-size: 15px; line-height: 1.55; color: var(--nfg-ink); margin: 8px 0 24px; max-width: 480px; }
+.nfg-login-form { display: flex; flex-direction: column; gap: 14px; max-width: 360px; }
+.nfg-login-form label { display: flex; flex-direction: column; gap: 6px; font-family: var(--nfg-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nfg-ink-soft); }
+.nfg-login-form input { background: var(--nfg-bg-card); border: 1px solid var(--nfg-line); border-radius: 10px; padding: 11px 14px; font-family: var(--nfg-sans); font-size: 14px; color: var(--nfg-ink); }
+.nfg-login-form button { margin-top: 4px; }
+.nfg-mehr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+.nfg-more-card { background: var(--nfg-bg-card); border: 1px solid var(--nfg-line); border-radius: 16px; padding: 20px 22px 22px; }
+.nfg-more-card.full { grid-column: 1 / -1; }
+.nfg-more-h { font-family: var(--nfg-display); font-size: 22px; font-weight: 400; color: var(--nfg-primary); margin: 0 0 12px; letter-spacing: -0.01em; }
+.nfg-more-card p { font-size: 14px; line-height: 1.55; margin: 0 0 10px; }
+.nfg-rubric { display: flex; flex-direction: column; gap: 14px; }
+.nfg-rubric-row { border-top: 1px solid var(--nfg-line); padding-top: 12px; }
+.nfg-rubric-bar { height: 4px; background: rgba(31,61,43,0.1); border-radius: 999px; margin-bottom: 6px; }
+.nfg-rubric-bar span { display: block; height: 100%; background: var(--nfg-primary); border-radius: 999px; }
+.nfg-rubric-meta { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+.nfg-rubric-meta span { font-family: var(--nfg-mono); font-size: 11px; color: var(--nfg-ink-soft); }
+.nfg-rubric ul { margin: 0; padding: 0 0 0 16px; font-size: 13px; color: var(--nfg-ink-soft); }
+.nfg-mag { display: flex; flex-direction: column; gap: 10px; }
+.nfg-mag-card { display: flex; gap: 12px; background: var(--nfg-bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--nfg-line); }
+.nfg-mag-card > div:first-child { width: 100px; height: 80px; flex-shrink: 0; }
+.nfg-mag-card > div:last-child { padding: 12px 14px 12px 0; }
+.nfg-mag-kind { font-family: var(--nfg-mono); font-size: 10px; letter-spacing: 0.06em; color: var(--nfg-accent); text-transform: uppercase; }
+.nfg-mag-card h4 { font-family: var(--nfg-display); font-weight: 400; margin: 4px 0 0; font-size: 15px; line-height: 1.2; color: var(--nfg-primary); }
+.nfg-events { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.nfg-events li { display: grid; grid-template-columns: 90px 1fr 20px; gap: 12px; align-items: center; border-top: 1px solid var(--nfg-line); padding-top: 12px; }
+.nfg-events li:first-child { border-top: 0; padding-top: 0; }
+.nfg-event-date { font-family: var(--nfg-mono); font-size: 10px; color: var(--nfg-accent); letter-spacing: 0.04em; }
+.nfg-events b { display: block; font-family: var(--nfg-display); font-weight: 400; font-size: 16px; color: var(--nfg-primary); }
+.nfg-events span { font-size: 12px; color: var(--nfg-ink-soft); }
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .nfg-sidebar { display: none; }
+  .nfg-mobile-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: rgba(251,248,240,0.97); backdrop-filter: blur(20px); border-top: 1px solid var(--nfg-line); z-index: 60; }
+  .nfg-mobile-nav button { flex: 1; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-family: var(--nfg-sans); font-size: 10px; color: var(--nfg-ink-soft); cursor: pointer; position: relative; }
+  .nfg-mobile-nav button.on { color: var(--nfg-primary); font-weight: 500; }
+  .nfg-mobile-badge { position: absolute; top: 4px; right: calc(50% - 22px); background: var(--nfg-accent); color: #fff; font-size: 9px; font-weight: 600; border-radius: 999px; min-width: 15px; height: 15px; padding: 0 3px; display: inline-flex; align-items: center; justify-content: center; }
+  .nfg-main { padding-bottom: 60px; }
+  .nfg-hd, .nfg-toolbar, .nfg-content, .nfg-map-section, .nfg-page { padding-left: 16px; padding-right: 16px; }
+  .nfg-list { grid-template-columns: 1fr; }
+  .nfg-mehr-grid { grid-template-columns: 1fr; }
+}
+@media (min-width: 769px) { .nfg-mobile-nav { display: none; } }
+</style>
 </head>
 <body>
-  <div id="root"></div>
+<div id="root"></div>
 
-  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-  <script src="data/restaurants.js"></script>
-  <script type="text/babel" src="app.jsx"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+
+<script>
+const NFG_LISTINGS = [
+  { id:'kle', name:'KLE', type:'Restaurant', city:'Zürich', region:'ZH', lat:47.388, lng:8.524, tags:['Pflanzenbasiert','Bio','Regenerativ','Saisonal'], score:9, book:true, image:'forest', short:'Pflanzenbasiertes Tasting-Menü mit Zutaten aus regenerativem Anbau. Eine konsequente Küche ohne Kompromisse.' },
+  { id:'mraven', name:'Mraven', type:'Restaurant', city:'Zürich', region:'ZH', lat:47.376, lng:8.541, tags:['Pflanzenbasiert','Bio','Saisonal'], score:8, book:true, image:'sage', short:'Pflanzliche Küche im Kreis 4 mit Fokus auf lokale Produzent:innen und fermentierte Komponenten.' },
+  { id:'noir', name:'NOIR', type:'Restaurant', city:'Zürich', region:'ZH', lat:47.366, lng:8.535, tags:['Bio','Regional','Saisonal'], score:8, book:true, image:'clay', short:'Reduzierte Karte, ehrliches Handwerk, klare Produktherkunft.' },
+  { id:'gamper', name:'Gamper', type:'Restaurant', city:'Zürich', region:'ZH', lat:47.378, lng:8.527, tags:['Saisonal','Regional','Handwerk'], score:8, book:true, image:'forest', short:'Bistro-Klassiker neu gedacht — Karte wechselt mit dem, was die Höfe gerade liefern.' },
+  { id:'rosi', name:'Rosi', type:'Restaurant', city:'Zürich', region:'ZH', lat:47.371, lng:8.530, tags:['Saisonal','Regional'], score:7, book:true, image:'wheat', short:'Bodenständig, saisonal, ohne Schnörkel.' },
+  { id:'magdi', name:'Magdi', type:'Restaurant', city:'Zürich', region:'ZH', lat:47.392, lng:8.532, tags:['Pflanzenbasiert','Bio'], score:7, book:true, image:'sage', short:'Stadtküche mit klarer pflanzlicher Ausrichtung.' },
+  { id:'fork-bottle', name:'Fork & Bottle', type:'Restaurant', city:'Uitikon', region:'ZH', lat:47.366, lng:8.470, tags:['Bio','Regional','Wein'], score:8, book:true, image:'clay', short:'Nachhaltig orientierte Weinküche am Stadtrand.' },
+  { id:'rechberg', name:'Rechberg 1837', type:'Restaurant', city:'Zürich', region:'ZH', lat:47.372, lng:8.547, tags:['Regenerativ','Bio','Historisch','Regional'], score:9, featured:true, book:true, image:'forest', short:'Konsequent regenerativ. Nur Zutaten, die historisch in der Region verfügbar waren — radikal lokal.' },
+  { id:'ona', name:'ONA', type:'Restaurant', city:'Zürich', region:'ZH', lat:47.385, lng:8.515, tags:['Pflanzenbasiert','Bio','Fine Dining'], score:9, book:true, image:'sage', short:'Vegane Sterneküche — präzise, technisch, mit klarer Haltung zur Herkunft.' },
+  { id:'volkshaus', name:'Restaurant Volkshaus', type:'Restaurant', city:'Zürich', region:'ZH', lat:47.376, lng:8.531, tags:['Saisonal','Bio'], score:7, book:true, image:'wheat', short:'Brasserie mit Bekenntnis zu Bio-Bezugsquellen.' },
+  { id:'lokal', name:'Lokal', type:'Restaurant', city:'Bern', region:'BE', lat:46.948, lng:7.447, tags:['Regional','Saisonal','Bio'], score:8, book:true, image:'forest', short:'Berner Küche ohne Umwege — direkt von Höfen aus dem Kanton.' },
+  { id:'einstein', name:'Einstein Gourmet', type:'Restaurant', city:'Bern', region:'BE', lat:46.947, lng:7.452, tags:['Fine Dining','Regional'], score:8, book:true, image:'clay', short:'Sterneküche mit Fokus auf Schweizer Produzent:innen.' },
+  { id:'mille-sens', name:'Mille Sens', type:'Restaurant', city:'Bern', region:'BE', lat:46.944, lng:7.439, tags:['Saisonal','Bio'], score:7, book:true, image:'sage', short:'Marktfrisch, saisonal, mit klarer Lieferantenliste.' },
+  { id:'krafft', name:'Krafft', type:'Restaurant', city:'Basel', region:'BS', lat:47.563, lng:7.591, tags:['Regional','Saisonal'], score:7, book:true, image:'wheat', short:'Rheinküche mit Verankerung in der Nordwestschweiz.' },
+  { id:'volkshaus-bs', name:'Volkshaus Basel', type:'Restaurant', city:'Basel', region:'BS', lat:47.561, lng:7.594, tags:['Bio','Saisonal'], score:7, book:true, image:'forest', short:'Brasserie-Klassiker mit Bio-Bezug.' },
+  { id:'roots', name:'Roots', type:'Restaurant', city:'Basel', region:'BS', lat:47.559, lng:7.588, tags:['Pflanzenbasiert','Regenerativ'], score:8, book:true, image:'sage', short:'Pflanzliche Tasting-Menüs, eng mit lokalen Höfen verzahnt.' },
+  { id:'galliker', name:'Wirtshaus Galliker', type:'Restaurant', city:'Luzern', region:'LU', lat:47.054, lng:8.305, tags:['Tradition','Regional'], score:7, book:true, image:'clay', short:'Innerschweizer Wirtshausküche, regional verankert.' },
+  { id:'helvetia', name:'Hotel Helvetia', type:'Restaurant', city:'Luzern', region:'LU', lat:47.050, lng:8.310, tags:['Saisonal','Bio'], score:7, book:true, image:'forest', short:'Saisonale Karte mit klarem Bezug zu Innerschweizer Produzent:innen.' },
+  { id:'cafe-grutli', name:'Café du Grütli', type:'Restaurant', city:'Genf', region:'GE', lat:46.201, lng:6.144, tags:['Bio','Pflanzenbasiert','Regional'], score:8, book:true, image:'sage', short:'Genfer Treffpunkt mit Bio-Küche und engem Kreis an Lieferant:innen.' },
+  { id:'tosca', name:'Tosca', type:'Restaurant', city:'Genf', region:'GE', lat:46.207, lng:6.139, tags:['Saisonal','Italienisch'], score:7, book:true, image:'clay', short:'Italienisch-saisonale Küche mit Fokus auf kleine Höfe.' },
+  { id:'denoriega', name:'Denoriega', type:'Restaurant', city:'Lausanne', region:'VD', lat:46.521, lng:6.633, tags:['Pflanzenbasiert','Bio'], score:8, book:true, image:'wheat', short:'Pflanzliche Küche in Lausanne — pur und klar.' },
+  { id:'damien-germanier', name:'Damien Germanier', type:'Restaurant', city:'Sion', region:'VS', lat:46.234, lng:7.360, tags:['Fine Dining','Regional'], score:8, book:true, image:'forest', short:'Walliser Sterneküche mit eigener Bergrindzucht.' },
+  { id:'igniv', name:'IGNIV', type:'Restaurant', city:'Bad Ragaz', region:'GR', lat:47.009, lng:9.502, tags:['Fine Dining','Regional','Sharing'], score:8, book:true, image:'sage', short:'Sharing Fine Dining mit Bündner Produzent:innen-Netzwerk.' },
+  { id:'schauenstein', name:'Schloss Schauenstein', type:'Restaurant', city:'Fürstenau', region:'GR', lat:46.732, lng:9.456, tags:['Fine Dining','Regenerativ','Bio'], score:9, featured:true, book:true, image:'clay', short:'Andreas Caminada — radikal lokale Bündner Hochküche mit eigenem regenerativen Anbau.' },
+  { id:'meta-hofmann', name:'Meta Hofmann', type:'Restaurant', city:'Chur', region:'GR', lat:46.851, lng:9.532, tags:['Saisonal','Bio'], score:7, book:true, image:'wheat', short:'Bündner Stadtküche mit Bergbauern-Lieferant:innen.' },
+  { id:'metropolitan', name:'Metropolitan', type:'Restaurant', city:'Lugano', region:'TI', lat:46.005, lng:8.951, tags:['Italienisch','Saisonal','Bio'], score:7, book:true, image:'sage', short:'Tessiner Küche mit italienischer Handschrift, saisonale Karte.' },
+  { id:'kraehe', name:'Krähe', type:'Restaurant', city:'St. Gallen', region:'SG', lat:47.423, lng:9.376, tags:['Regional','Handwerk'], score:7, book:true, image:'forest', short:'Ostschweizer Wirtshausküche neu interpretiert.' },
+  { id:'farm-pur', name:'Farm Pur', type:'Landwirt:in', city:'Hinwil', region:'ZH', lat:47.298, lng:8.846, tags:['Regenerativ','Bio','Gemüse'], score:null, top50:true, image:'sage', short:'Regenerativer Gemüsebau am Zürcher Oberland — beliefert KLE und Rechberg.' },
+  { id:'stiftung-fintan', name:'Stiftung Fintan', type:'Landwirt:in', city:'Rheinau', region:'ZH', lat:47.638, lng:8.605, tags:['Bio','Demeter','Saatgut'], score:null, top50:true, image:'wheat', short:'Demeter-Pionierhof mit eigenem Saatgut-Programm.' },
+  { id:'gut-rheinau', name:'Gut Rheinau', type:'Landwirt:in', city:'Rheinau', region:'ZH', lat:47.640, lng:8.602, tags:['Bio','Demeter'], score:null, top50:true, image:'forest', short:'Bio-Pionierbetrieb mit klarer Sortenvielfalt.' },
+  { id:'sool-hof', name:'Sool-Hof', type:'Landwirt:in', city:'Schwanden', region:'GL', lat:47.000, lng:9.066, tags:['Regenerativ','Bergbau'], score:null, image:'clay', short:'Glarner Bergbetrieb — Mutterkuhhaltung im regenerativen Modell.' },
+  { id:'humus-brot', name:'Humus Brot', type:'Verarbeiter:in', city:'Zürich', region:'ZH', lat:47.382, lng:8.529, tags:['Bio','Sauerteig','Urgetreide'], score:null, image:'wheat', short:'Sauerteig-Bäckerei mit Urgetreide und langer Teigführung.' },
+  { id:'gmuer', name:'Metzgerei Gmür', type:'Verarbeiter:in', city:'Zürich', region:'ZH', lat:47.379, lng:8.535, tags:['Tierwohl','Ganztiernutzung'], score:null, image:'clay', short:'Stadtmetzgerei mit konsequenter Ganztiernutzung.' },
+  { id:'jumi', name:'Jumi', type:'Verarbeiter:in', city:'Boll', region:'BE', lat:46.939, lng:7.527, tags:['Käse','Handwerk','Bio'], score:null, image:'sage', short:'Affineure für mutige Käse aus kleinen Sennereien.' },
+  { id:'soiltosoul-shop', name:'Soil to Soul Shop', type:'Laden', city:'Zürich', region:'ZH', lat:47.371, lng:8.540, tags:['Kuratiert','Bio'], score:null, image:'forest', short:'Kuratierter Laden mit Produkten aller im Guide gelisteten Höfe.' },
+  { id:'marktlucke', name:'Marktlücke', type:'Laden', city:'Bern', region:'BE', lat:46.949, lng:7.450, tags:['Hofladen','Bio'], score:null, image:'wheat', short:'Stadt-Hofladen für Berner Höfe.' },
+  { id:'sts-symposium', name:'Soil to Soul Symposium', type:'Event', city:'Zürich', region:'ZH', lat:47.366, lng:8.542, tags:['Symposium','Jährlich'], score:null, date:'03.–05. Sep 2026', image:'forest', short:'Jährliches Symposium zu regenerativer Esskultur — Talks, Tastings, Werkstätten.' },
+  { id:'bodenfest', name:'Bodenfest', type:'Event', city:'Rheinau', region:'ZH', lat:47.640, lng:8.605, tags:['Festival','Hof'], score:null, date:'14. Jun 2026', image:'sage', short:'Hoffest mit Markt, Küche, Konzerten — direkt am Boden.' }
+];
+const NFG_RELATIONS = {
+  'kle':{'sources':['farm-pur','stiftung-fintan','humus-brot'],'delivers':[]},
+  'rechberg':{'sources':['farm-pur','gut-rheinau','gmuer'],'delivers':[]},
+  'farm-pur':{'sources':[],'delivers':['kle','rechberg','mraven']},
+  'stiftung-fintan':{'sources':[],'delivers':['kle','ona']},
+  'humus-brot':{'sources':['gut-rheinau'],'delivers':['kle','magdi','soiltosoul-shop']},
+  'schauenstein':{'sources':['sool-hof'],'delivers':[]}
+};
+</script>
+
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+const TYPE_COLORS = {'Restaurant':'#C7522A','Verarbeiter:in':'#7A5C3E','Landwirt:in':'#5A7A3A','Laden':'#3F6280','Event':'#8E4A8E'};
+const TYPE_DOT = (t) => TYPE_COLORS[t] || '#666';
+const PH_COLORS = {forest:['#2d4a36','#3d5e44'],sage:['#7a8c5e','#94a577'],clay:['#a86142','#c2785a'],wheat:['#c69b5e','#d9b377']};
+const CATEGORIES = [{id:'Restaurant',label:'Restaurants'},{id:'Verarbeiter:in',label:'Verarbeiter:innen'},{id:'Landwirt:in',label:'Landwirt:innen'},{id:'Laden',label:'Läden'},{id:'Event',label:'Events & Pop-Ups'}];
+const TAGS = ['Regenerativ','Bio','Pflanzenbasiert','Saisonal','Regional','Demeter','Tierwohl','Handwerk','Fine Dining'];
+
+function Ph({kind='forest',label,tall}) {
+  const [a,b] = PH_COLORS[kind]||PH_COLORS.forest;
+  return <div className={'nfg-ph'+(tall?' tall':'')} style={{background:`linear-gradient(135deg,${a},${b})`}}>
+    <svg width="100%" height="100%" style={{position:'absolute',inset:0,opacity:0.18}}>
+      <defs><pattern id={'p'+kind} width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><line x1="0" y1="0" x2="0" y2="8" stroke="#fff" strokeWidth="1.2"/></pattern></defs>
+      <rect width="100%" height="100%" fill={`url(#p${kind})`}/>
+    </svg>
+    {label&&<span className="nfg-ph-lbl">{label}</span>}
+  </div>;
+}
+
+function Sidebar({tab,setTab,savedCount}) {
+  return <aside className="nfg-sidebar">
+    <div className="nfg-sidebar-brand">
+      <div className="nfg-sidebar-by">by Soil to Soul</div>
+      <div className="nfg-sidebar-ttl">Natural<br/>Food Guide</div>
+    </div>
+    <nav>
+      {[
+        {id:'guide',label:'Guide',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v16M15 6v16"/></svg>},
+        {id:'merkliste',label:'Merkliste',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill={tab==='merkliste'?'currentColor':'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>},
+        {id:'mehr',label:'Mehr',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>}
+      ].map(b=><button key={b.id} className={'nfg-sidebar-btn'+(tab===b.id?' on':'')} onClick={()=>setTab(b.id)}>
+        {b.icon}{b.label}
+        {b.id==='merkliste'&&savedCount>0&&<span className="nfg-sidebar-badge">{savedCount}</span>}
+      </button>)}
+    </nav>
+  </aside>;
+}
+
+function MobileNav({tab,setTab,savedCount}) {
+  return <nav className="nfg-mobile-nav">
+    <button className={tab==='guide'?'on':''} onClick={()=>setTab('guide')}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v16M15 6v16"/></svg>Guide
+    </button>
+    <button className={tab==='merkliste'?'on':''} onClick={()=>setTab('merkliste')}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill={tab==='merkliste'?'currentColor':'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      Merkliste{savedCount>0&&<span className="nfg-mobile-badge">{savedCount}</span>}
+    </button>
+    <button className={tab==='mehr'?'on':''} onClick={()=>setTab('mehr')}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>Mehr
+    </button>
+  </nav>;
+}
+
+function ListingCard({item,onOpen,saved,onSave}) {
+  return <article className={'nfg-card'+(item.featured?' featured':'')} onClick={()=>onOpen(item)}>
+    <div className="nfg-card-img">
+      <Ph kind={item.image||'forest'} label={`${item.type} · ${item.city}`}/>
+      {item.score!=null&&<div className="nfg-score"><b>{item.score}</b><span>/10</span></div>}
+      {item.top50&&<div className="nfg-badge-top50">Top 50 Farmers</div>}
+      <button className={'nfg-save'+(saved?' on':'')} onClick={e=>{e.stopPropagation();onSave(item.id);}}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill={saved?'currentColor':'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      </button>
+    </div>
+    <div className="nfg-card-body">
+      <div className="nfg-card-meta">
+        <span className="nfg-card-type" style={{color:TYPE_DOT(item.type)}}><i style={{background:TYPE_DOT(item.type)}}/> {item.type}</span>
+        <span>{item.city}</span>
+      </div>
+      <h3 className="nfg-card-name">{item.name}</h3>
+      <p className="nfg-card-short">{item.short}</p>
+      <div className="nfg-card-tags">{item.tags.slice(0,3).map(t=><span key={t} className="nfg-card-tag">{t}</span>)}</div>
+    </div>
+  </article>;
+}
+
+function Profile({item,onClose,saved,onSave,onOpen}) {
+  const rel = NFG_RELATIONS[item.id]||{sources:[],delivers:[]};
+  const byId = id=>NFG_LISTINGS.find(x=>x.id===id);
+  const [liked,setLiked]=useState(false);
+  const [likes,setLikes]=useState(Math.floor(80+Math.random()*220));
+  const criteria=[
+    {k:'Regenerativer Anbau bei Lieferant:innen',met:item.tags.includes('Regenerativ')},
+    {k:'Mind. 70% Bio-/Demeter-Zutaten',met:item.tags.includes('Bio')||item.tags.includes('Demeter')},
+    {k:'Saisonal wechselnde Karte',met:item.tags.includes('Saisonal')},
+    {k:'Pflanzenbasiert oder reduzierter Tieranteil',met:item.tags.includes('Pflanzenbasiert')},
+    {k:'Direkter Bezug von Schweizer Produzent:innen',met:item.tags.includes('Regional')||item.tags.includes('Bio')},
+    {k:'Transparente Lieferantenliste',met:rel.sources.length>0},
+    {k:'Ganztiernutzung / Tierwohl',met:item.tags.includes('Tierwohl')||item.tags.includes('Ganztiernutzung')}
+  ];
+  return <div className="nfg-profile" onClick={e=>{if(e.target.classList.contains('nfg-profile'))onClose();}}>
+    <div className="nfg-profile-sheet">
+      <button className="nfg-profile-close" onClick={onClose}>×</button>
+      <div className="nfg-profile-hero">
+        <Ph kind={item.image||'forest'} label={`Hero · ${item.name}`} tall/>
+        <div className="nfg-profile-thumbs"><Ph kind="sage" label="img 2"/><Ph kind="clay" label="img 3"/><Ph kind="wheat" label="img 4"/></div>
+      </div>
+      <div className="nfg-profile-body">
+        <div className="nfg-profile-meta">
+          <span className="nfg-card-type" style={{color:TYPE_DOT(item.type)}}><i style={{background:TYPE_DOT(item.type)}}/> {item.type}</span>
+          <span>·</span><span>{item.city}, {item.region}</span>
+        </div>
+        <h1 className="nfg-profile-name">{item.name}</h1>
+        <p className="nfg-profile-short">{item.short}</p>
+        {item.score!=null&&<div className="nfg-profile-score">
+          <div className="nfg-profile-score-num"><b>{item.score}</b><span>/10</span></div>
+          <div><div className="nfg-profile-score-lbl">Bewertung nach NFG-Kriterien</div><a href="#kriterien" className="nfg-link">Kriterien ansehen →</a></div>
+        </div>}
+        {item.top50&&<div className="nfg-top50-banner"><span className="nfg-top50-icon">★</span><div><b>Top 50 Farmers</b><small>Ausgezeichnet 2026</small></div></div>}
+        <div className="nfg-actions">
+          {item.book&&<button className="nfg-btn-primary">Book a Table</button>}
+          <button className={'nfg-btn-ghost'+(liked?' on':'')} onClick={()=>{setLiked(!liked);setLikes(l=>l+(liked?-1:1));}}>♥ {likes}</button>
+          <button className={'nfg-btn-ghost'+(saved?' on':'')} onClick={()=>onSave(item.id)}>{saved?'✓ Gespeichert':'Merken'}</button>
+        </div>
+        {item.score!=null&&criteria.some(c=>c.met)&&<section className="nfg-section">
+          <h3 className="nfg-section-h">Erfüllte Kriterien</h3>
+          <ul className="nfg-criteria">{criteria.filter(c=>c.met).map(c=><li key={c.k}><span className="nfg-check">✓</span>{c.k}</li>)}</ul>
+        </section>}
+        <section className="nfg-section">
+          <h3 className="nfg-section-h">Tags</h3>
+          <div className="nfg-card-tags">{item.tags.map(t=><span key={t} className="nfg-card-tag">{t}</span>)}</div>
+        </section>
+        {(rel.sources.length>0||rel.delivers.length>0)&&<section className="nfg-section">
+          <h3 className="nfg-section-h">Beziehungen</h3>
+          {rel.sources.length>0&&<div className="nfg-rel"><div className="nfg-rel-lbl">Bezieht von</div><div className="nfg-rel-row">{rel.sources.map(id=>{const r=byId(id);return r&&<button key={id} className="nfg-rel-chip" onClick={()=>onOpen(r)}><i style={{background:TYPE_DOT(r.type)}}/>{r.name}</button>;})}</div></div>}
+          {rel.delivers.length>0&&<div className="nfg-rel"><div className="nfg-rel-lbl">Liefert an</div><div className="nfg-rel-row">{rel.delivers.map(id=>{const r=byId(id);return r&&<button key={id} className="nfg-rel-chip" onClick={()=>onOpen(r)}><i style={{background:TYPE_DOT(r.type)}}/>{r.name}</button>;})}</div></div>}
+        </section>}
+        <section className="nfg-section">
+          <h3 className="nfg-section-h">Kommentare</h3>
+          <div className="nfg-comment-empty"><p>Login für Kommentare erforderlich.</p><button className="nfg-btn-ghost">Anmelden</button></div>
+        </section>
+      </div>
+    </div>
+  </div>;
+}
+
+function SwissMap({items,onPick,focusId}) {
+  const proj=(lat,lng)=>[((lng-5.9)/(10.5-5.9))*360+12,((47.8-lat)/(47.8-45.8))*180+12];
+  return <div className="nfg-map-wrap">
+    <svg viewBox="0 0 384 204" className="nfg-map">
+      <defs><pattern id="topo" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="0.5" fill="#1f3d2b" opacity="0.18"/></pattern></defs>
+      <path d="M40,80 C45,55 70,40 100,42 C120,28 145,30 165,40 C185,32 210,30 235,40 C260,35 295,38 330,55 C355,65 365,85 360,110 C355,135 330,150 305,148 C285,160 255,165 230,158 C205,168 175,170 150,160 C125,170 95,168 70,155 C50,148 35,130 38,110 Z" fill="#e8e1cf" stroke="#1f3d2b" strokeWidth="1" opacity="0.85"/>
+      <path d="M40,80 C45,55 70,40 100,42 C120,28 145,30 165,40 C185,32 210,30 235,40 C260,35 295,38 330,55 C355,65 365,85 360,110 C355,135 330,150 305,148 C285,160 255,165 230,158 C205,168 175,170 150,160 C125,170 95,168 70,155 C50,148 35,130 38,110 Z" fill="url(#topo)"/>
+      <ellipse cx="155" cy="115" rx="22" ry="6" fill="#a8bfc9" opacity="0.7"/>
+      <ellipse cx="105" cy="135" rx="20" ry="5" fill="#a8bfc9" opacity="0.7"/>
+      <ellipse cx="205" cy="100" rx="14" ry="4" fill="#a8bfc9" opacity="0.7"/>
+      {items.map(it=>{const[x,y]=proj(it.lat,it.lng);const f=focusId===it.id;return <g key={it.id} transform={`translate(${x},${y})`} onClick={()=>onPick(it)} style={{cursor:'pointer'}}>{f&&<circle r="14" fill={TYPE_DOT(it.type)} opacity="0.25"/>}<circle r={f?8:5} fill={TYPE_DOT(it.type)} stroke="#fff" strokeWidth="1.5"/></g>;})}
+      {[['Zürich',215,78],['Bern',145,110],['Basel',145,65],['Genf',60,165],['Lugano',245,175],['Chur',285,110]].map(([n,x,y])=><text key={n} x={x} y={y} fontSize="7" fill="#1f3d2b" opacity="0.6" fontFamily="ui-monospace,monospace">{n}</text>)}
+    </svg>
+    <div className="nfg-map-legend">{CATEGORIES.map(c=><span key={c.id}><i style={{background:TYPE_COLORS[c.id]}}/>{c.label}</span>)}</div>
+  </div>;
+}
+
+function GuidePage({saved,onSave,onOpen}) {
+  const [view,setView]=useState('list');
+  const [query,setQuery]=useState('');
+  const [cats,setCats]=useState(['Restaurant']);
+  const [tags,setTags]=useState([]);
+  const [city,setCity]=useState('');
+  const [locale,setLocale]=useState('DE');
+  const [focusId,setFocusId]=useState(null);
+  const filtered=useMemo(()=>NFG_LISTINGS.filter(it=>{
+    if(cats.length&&!cats.includes(it.type))return false;
+    if(tags.length&&!tags.every(t=>it.tags.includes(t)))return false;
+    if(city&&!it.city.toLowerCase().includes(city.toLowerCase()))return false;
+    if(query){const q=query.toLowerCase();if(![it.name,it.city,it.short,...it.tags].join(' ').toLowerCase().includes(q))return false;}
+    return true;
+  }),[query,cats,tags,city]);
+  const cities=useMemo(()=>Array.from(new Set(NFG_LISTINGS.map(x=>x.city))).sort(),[]);
+  const togCat=c=>setCats(cats.includes(c)?cats.filter(x=>x!==c):[...cats,c]);
+  const togTag=t=>setTags(tags.includes(t)?tags.filter(x=>x!==t):[...tags,t]);
+  return <>
+    <header className="nfg-hd">
+      <div className="nfg-hd-top">
+        <div className="nfg-hd-ttl">Guide</div>
+        <button className="nfg-lang" onClick={()=>setLocale(l=>l==='DE'?'EN':'DE')}>{locale}</button>
+      </div>
+      <div className="nfg-search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input value={query} onChange={e=>setQuery(e.target.value)} placeholder={locale==='DE'?'Suche nach Name, Stadt, Tag…':'Search name, city, tag…'}/>
+        {query&&<button className="nfg-clr" onClick={()=>setQuery('')}>×</button>}
+      </div>
+    </header>
+    <div className="nfg-toolbar">
+      <div className="nfg-cats">{CATEGORIES.map(c=>{const a=cats.includes(c.id);return <button key={c.id} className={'nfg-cat'+(a?' on':'')} onClick={()=>togCat(c.id)} style={a?{background:TYPE_COLORS[c.id],color:'#fff',borderColor:TYPE_COLORS[c.id]}:{}}><span className="nfg-cat-dot" style={{background:TYPE_COLORS[c.id]}}/>{c.label}</button>;})}</div>
+      <div className="nfg-toolbar-row">
+        <select className="nfg-select" value={city} onChange={e=>setCity(e.target.value)}><option value="">Alle Standorte</option>{cities.map(c=><option key={c} value={c}>{c}</option>)}</select>
+        <div className="nfg-viewtoggle"><button className={view==='list'?'on':''} onClick={()=>setView('list')}>Liste</button><button className={view==='map'?'on':''} onClick={()=>setView('map')}>Karte</button></div>
+      </div>
+      <div className="nfg-tags">{TAGS.map(t=><button key={t} className={'nfg-tag'+(tags.includes(t)?' on':'')} onClick={()=>togTag(t)}>{tags.includes(t)?'✓ ':'+ '}{t}</button>)}</div>
+    </div>
+    {view==='map'?<div className="nfg-map-section">
+      <SwissMap items={filtered} onPick={it=>setFocusId(it.id)} focusId={focusId}/>
+      {focusId?(()=>{const it=filtered.find(x=>x.id===focusId);return it&&<div className="nfg-map-pop" onClick={()=>onOpen(it)}><div><Ph kind={it.image} label={it.type}/></div><div><div className="nfg-card-meta"><span className="nfg-card-type" style={{color:TYPE_DOT(it.type)}}><i style={{background:TYPE_DOT(it.type)}}/>{it.type}</span><span>{it.city}</span></div><h4>{it.name}</h4><p>{it.short}</p><span className="nfg-link">Profil ansehen →</span></div></div>;})():<div className="nfg-map-hint">Tipp: Pin auf der Karte anklicken für Kurzinfo.</div>}
+    </div>:<div className="nfg-content">
+      <div className="nfg-result-head"><span><b>{filtered.length}</b> Einträge</span><span>{cats.length===1?CATEGORIES.find(c=>c.id===cats[0])?.label:'gemischt'}</span></div>
+      <div className="nfg-list">
+        {filtered.map(it=><ListingCard key={it.id} item={it} onOpen={onOpen} saved={saved.includes(it.id)} onSave={onSave}/>)}
+        {filtered.length===0&&<div className="nfg-empty">Keine Treffer. Filter anpassen.</div>}
+      </div>
+    </div>}
+  </>;
+}
+
+function MerklistePage({saved,onSave,onOpen}) {
+  const [loggedIn,setLoggedIn]=useState(false);
+  const items=NFG_LISTINGS.filter(x=>saved.includes(x.id));
+  if(!loggedIn)return <div className="nfg-page">
+    <h2 className="nfg-page-h">Meine Merkliste</h2>
+    <p className="nfg-login-hint">Speichere Profile in deine persönliche Merkliste, kommentiere und kuratiere deine eigene Karte. Anmeldung erforderlich.</p>
+    <form className="nfg-login-form" onSubmit={e=>{e.preventDefault();setLoggedIn(true);}}>
+      <label>E-Mail<input type="email" required defaultValue="hallo@example.ch"/></label>
+      <label>Passwort<input type="password" required defaultValue="••••••••"/></label>
+      <button className="nfg-btn-primary" type="submit">Anmelden</button>
+      <button className="nfg-btn-ghost" type="button">Konto erstellen</button>
+    </form>
+  </div>;
+  return <div className="nfg-page">
+    <h2 className="nfg-page-h">Meine Merkliste</h2>
+    <p className="nfg-page-sub">{items.length} gespeicherte {items.length===1?'Eintrag':'Einträge'}</p>
+    <div className="nfg-list">{items.length===0?<div className="nfg-empty">Noch nichts gespeichert.</div>:items.map(it=><ListingCard key={it.id} item={it} onOpen={onOpen} saved={true} onSave={onSave}/>)}</div>
+  </div>;
+}
+
+function MehrPage() {
+  const events=NFG_LISTINGS.filter(x=>x.type==='Event');
+  return <div className="nfg-page">
+    <h2 className="nfg-page-h">Mehr</h2>
+    <div className="nfg-mehr-grid">
+      <section className="nfg-more-card full"><h3 className="nfg-more-h">Was ist der Natural Food Guide?</h3><p>Ein kuratierter Guide für Restaurants, Verarbeiter:innen, Höfe, Läden sowie Pop-Ups & Events in der Schweiz, die mit Boden, Saison und Herkunft konsequent umgehen.</p><a href="#" className="nfg-link">Über uns →</a></section>
+      <section className="nfg-more-card" id="kriterien"><h3 className="nfg-more-h">Bewertungsraster</h3><div className="nfg-rubric">{[{c:'Boden & Anbau',w:25,items:['Regenerative Praxis','Bio-/Demeter-Zertifikate','Bodenfruchtbarkeit']},{c:'Herkunft & Kreislauf',w:25,items:['Direktbezug','Lieferantenliste','Ganztiernutzung']},{c:'Saison & Karte',w:20,items:['Wechselnde Karte','Saisonale Zutaten']},{c:'Pflanzenanteil',w:15,items:['Reduzierter Tieranteil','Pflanzliche Tiefe']},{c:'Transparenz',w:15,items:['Offene Kommunikation','Rückverfolgbarkeit']}].map(r=><div key={r.c} className="nfg-rubric-row"><div className="nfg-rubric-bar"><span style={{width:r.w+'%'}}/></div><div className="nfg-rubric-meta"><b>{r.c}</b><span>{r.w}%</span></div><ul>{r.items.map(i=><li key={i}>{i}</li>)}</ul></div>)}</div></section>
+      <section className="nfg-more-card"><h3 className="nfg-more-h">Magazin</h3><div className="nfg-mag">{[{t:'Portrait: Andreas Caminada',k:'Portrait',kind:'forest'},{t:'Editorial: Was heisst regenerativ wirklich?',k:'Editorial',kind:'sage'},{t:'Partner: Soil to Soul Symposium 2026',k:'Partner',kind:'clay'}].map(m=><article key={m.t} className="nfg-mag-card"><div><Ph kind={m.kind} label={m.k}/></div><div><span className="nfg-mag-kind">{m.k}</span><h4>{m.t}</h4></div></article>)}</div></section>
+      <section className="nfg-more-card"><h3 className="nfg-more-h">Eventkalender</h3><ul className="nfg-events">{events.map(e=><li key={e.id}><div className="nfg-event-date">{e.date}</div><div><b>{e.name}</b><span>{e.city} · {e.short}</span></div><a className="nfg-link" href="#">→</a></li>)}</ul></section>
+    </div>
+  </div>;
+}
+
+function App() {
+  const [tab,setTab]=useState('guide');
+  const [saved,setSaved]=useState(['rechberg','farm-pur']);
+  const [open,setOpen]=useState(null);
+  const onSave=id=>setSaved(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);
+  return <div className="nfg-shell">
+    <Sidebar tab={tab} setTab={setTab} savedCount={saved.length}/>
+    <main className="nfg-main">
+      {tab==='guide'&&<GuidePage saved={saved} onSave={onSave} onOpen={setOpen}/>}
+      {tab==='merkliste'&&<MerklistePage saved={saved} onSave={onSave} onOpen={setOpen}/>}
+      {tab==='mehr'&&<MehrPage/>}
+    </main>
+    <MobileNav tab={tab} setTab={setTab} savedCount={saved.length}/>
+    {open&&<Profile item={open} onClose={()=>setOpen(null)} saved={saved.includes(open.id)} onSave={onSave} onOpen={setOpen}/>}
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
 </body>
 </html>
