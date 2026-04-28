@@ -371,6 +371,9 @@ ALTER TABLE unternehmen ADD COLUMN IF NOT EXISTS photo_main TEXT;
 ALTER TABLE unternehmen ADD COLUMN IF NOT EXISTS photos TEXT[] DEFAULT '{}';
 ALTER TABLE unternehmen ADD COLUMN IF NOT EXISTS booking_url TEXT;
 ALTER TABLE unternehmen ADD COLUMN IF NOT EXISTS website_url TEXT;
+ALTER TABLE unternehmen ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE unternehmen ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE unternehmen ADD COLUMN IF NOT EXISTS email TEXT;
 
 -- Admin-User erstellen (Login: admin@naturalfoodguide.ch / PW: Admin)
 DO $$
@@ -702,6 +705,22 @@ function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth}) {
           {item.website_url&&<a className="nfg-btn-link outline" href={item.website_url} target="_blank" rel="noopener noreferrer">Website ↗</a>}
           <button className={'nfg-btn-ghost'+(saved?' on':'')} onClick={()=>onSave(item.id)}>{saved?'✓ Gespeichert':'Merken'}</button>
         </div>
+        {(item.address||item.phone||item.email)&&<section className="nfg-section">
+          <h3 className="nfg-section-h">Kontakt</h3>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {item.address&&<div style={{display:'flex',gap:10,alignItems:'flex-start',fontSize:14,color:'#444'}}>
+              <span style={{fontSize:16}}>📍</span><span>{item.address}</span>
+            </div>}
+            {item.phone&&<div style={{display:'flex',gap:10,alignItems:'center',fontSize:14}}>
+              <span style={{fontSize:16}}>📞</span>
+              <a href={`tel:${item.phone.replace(/\s/g,'')}`} style={{color:'#000',fontWeight:600,textDecoration:'none'}}>{item.phone}</a>
+            </div>}
+            {item.email&&<div style={{display:'flex',gap:10,alignItems:'center',fontSize:14}}>
+              <span style={{fontSize:16}}>✉️</span>
+              <a href={`mailto:${item.email}`} style={{color:'#000',fontWeight:600,textDecoration:'none'}}>{item.email}</a>
+            </div>}
+          </div>
+        </section>}
         {criteria.some(c=>c.met)&&<section className="nfg-section">
           <h3 className="nfg-section-h">Erfüllte Kriterien</h3>
           <ul className="nfg-criteria">{criteria.filter(c=>c.met).map(c=><li key={c.k}><span className="nfg-check">✓</span>{c.k}</li>)}</ul>
@@ -846,7 +865,7 @@ function MehrPage({listings}) {
 }
 
 // ── Listing form modal ─────────────────────────────────────────
-const EMPTY_FORM = {name:'',type:'Restaurant',city:'',region:'',lat:'',lng:'',tags:'',score:'',short:'',book:false,image:'forest',featured:false,date:'',top50:false,photo_main:'',photos:[],booking_url:'',website_url:''};
+const EMPTY_FORM = {name:'',type:'Restaurant',city:'',region:'',lat:'',lng:'',tags:'',score:'',short:'',book:false,image:'forest',featured:false,date:'',top50:false,photo_main:'',photos:[],booking_url:'',website_url:'',address:'',phone:'',email:''};
 
 // ── Image upload slot ───────────────────────────────────────────
 function ImageSlot({url,label,onUpload,onRemove,itemId,slot}) {
@@ -888,7 +907,10 @@ function ListingFormModal({initial,onClose,onSave}) {
     photo_main:initial.photo_main||'',
     photos:Array.isArray(initial.photos)?initial.photos:[],
     booking_url:initial.booking_url||'',
-    website_url:initial.website_url||''
+    website_url:initial.website_url||'',
+    address:initial.address||'',
+    phone:initial.phone||'',
+    email:initial.email||''
   }:EMPTY_FORM);
   const [err,setErr]=useState('');
   const [saving,setSaving]=useState(false);
@@ -923,7 +945,10 @@ function ListingFormModal({initial,onClose,onSave}) {
       photo_main:f.photo_main||null,
       photos:(f.photos||[]).filter(Boolean),
       booking_url:f.booking_url.trim()||null,
-      website_url:f.website_url.trim()||null
+      website_url:f.website_url.trim()||null,
+      address:f.address.trim()||null,
+      phone:f.phone.trim()||null,
+      email:f.email.trim()||null
     };
     const error=await onSave(listing,!!initial);
     setSaving(false);
@@ -960,6 +985,12 @@ function ListingFormModal({initial,onClose,onSave}) {
         </div>
         {f.type==='Event'&&<div className="nfg-form-row one"><label className="nfg-label">Datum<input {...inp} value={f.date} onChange={e=>set('date',e.target.value)} placeholder="14. Jun 2026"/></label></div>}
 
+        <div className="nfg-form-section-h">Kontakt</div>
+        <div className="nfg-form-row one"><label className="nfg-label">Adresse<input {...inp} value={f.address} onChange={e=>set('address',e.target.value)} placeholder="Musterstrasse 12, 8001 Zürich"/></label></div>
+        <div className="nfg-form-row">
+          <label className="nfg-label">Telefon<input {...inp} type="tel" value={f.phone} onChange={e=>set('phone',e.target.value)} placeholder="+41 44 000 00 00"/></label>
+          <label className="nfg-label">E-Mail<input {...inp} type="email" value={f.email} onChange={e=>set('email',e.target.value)} placeholder="info@beispiel.ch"/></label>
+        </div>
         <div className="nfg-form-section-h">Links</div>
         <div className="nfg-form-row one"><label className="nfg-label">Website URL<input {...inp} type="url" value={f.website_url} onChange={e=>set('website_url',e.target.value)} placeholder="https://restaurant-beispiel.ch"/></label></div>
         <div className="nfg-form-row one">
