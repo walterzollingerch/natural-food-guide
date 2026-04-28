@@ -254,6 +254,7 @@ window.NFG_CONFIGURED = !window.SUPABASE_URL.includes('YOUR_PROJECT_ID');
 CREATE TABLE IF NOT EXISTS user_profiles (
   id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
   name TEXT,
+  role TEXT NOT NULL DEFAULT 'user',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -302,12 +303,17 @@ ALTER TABLE saved_items   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments      ENABLE ROW LEVEL SECURITY;
 
 -- Policies: user_profiles
-CREATE POLICY "Öffentlich lesbar"       ON user_profiles FOR SELECT USING (true);
+CREATE POLICY "Öffentlich lesbar"         ON user_profiles FOR SELECT USING (true);
 CREATE POLICY "Eigenes Profil bearbeiten" ON user_profiles FOR ALL    USING (auth.uid() = id);
+CREATE POLICY "Admins verwalten"          ON user_profiles FOR ALL    USING (
+  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+);
 
--- Policies: unternehmen (öffentlich lesbar, eingeloggt schreiben)
-CREATE POLICY "Öffentlich lesbar"   ON unternehmen FOR SELECT USING (true);
-CREATE POLICY "Eingeloggt schreiben" ON unternehmen FOR ALL    USING (auth.uid() IS NOT NULL);
+-- Policies: unternehmen (öffentlich lesbar, nur Admins schreiben)
+CREATE POLICY "Öffentlich lesbar"  ON unternehmen FOR SELECT USING (true);
+CREATE POLICY "Nur Admins schreiben" ON unternehmen FOR ALL USING (
+  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+);
 
 -- Policies: saved_items (nur eigene)
 CREATE POLICY "Nur eigene" ON saved_items FOR ALL USING (auth.uid() = user_id);
@@ -330,6 +336,31 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- Admin-User erstellen (Login: admin@naturalfoodguide.ch / PW: Admin)
+DO $$
+DECLARE new_id UUID := gen_random_uuid();
+BEGIN
+  INSERT INTO auth.users (
+    id, instance_id, aud, role, email, encrypted_password,
+    email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+    is_super_admin, created_at, updated_at,
+    confirmation_token, email_change, email_change_token_new, recovery_token
+  ) VALUES (
+    new_id,
+    '00000000-0000-0000-0000-000000000000',
+    'authenticated', 'authenticated',
+    'admin@naturalfoodguide.ch',
+    crypt('Admin', gen_salt('bf')),
+    NOW(),
+    '{"provider":"email","providers":["email"]}',
+    '{"name":"Admin"}',
+    false, NOW(), NOW(), '', '', '', ''
+  )
+  ON CONFLICT (email) DO NOTHING;
+  UPDATE user_profiles SET role = 'admin' WHERE id = new_id;
+END;
+$$;
 
 ================================================================ */
 </script>
@@ -474,12 +505,12 @@ function AuthModal({mode='login',onClose,onAuth}) {
 }
 
 // ── Sidebar ────────────────────────────────────────────────────
-function Sidebar({tab,setTab,savedCount,user,onAuth,onLogout}) {
+function Sidebar({tab,setTab,savedCount,user,isAdmin,onAuth,onLogout}) {
   const navItems = [
     {id:'guide',   label:'Guide',    icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v16M15 6v16"/></svg>},
     {id:'merkliste',label:'Merkliste',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill={tab==='merkliste'?'currentColor':'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>},
     {id:'mehr',    label:'Mehr',     icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>},
-    ...(user?[{id:'verwalten',label:'Verwalten',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>}]:[])
+    ...(isAdmin?[{id:'verwalten',label:'Verwalten',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>}]:[])
   ];
   return <aside className="nfg-sidebar">
     <div className="nfg-sidebar-brand">
@@ -511,7 +542,7 @@ function Sidebar({tab,setTab,savedCount,user,onAuth,onLogout}) {
 }
 
 // ── Mobile nav ─────────────────────────────────────────────────
-function MobileNav({tab,setTab,savedCount,user,onAuth}) {
+function MobileNav({tab,setTab,savedCount,user,isAdmin,onAuth}) {
   return <nav className="nfg-mobile-nav">
     <button className={tab==='guide'?'on':''} onClick={()=>setTab('guide')}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v16M15 6v16"/></svg>Guide
@@ -523,10 +554,14 @@ function MobileNav({tab,setTab,savedCount,user,onAuth}) {
     <button className={tab==='mehr'?'on':''} onClick={()=>setTab('mehr')}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>Mehr
     </button>
-    <button className={(tab==='verwalten')?'on':''} onClick={()=>user?setTab('verwalten'):onAuth('login')}>
+    {isAdmin&&<button className={(tab==='verwalten')?'on':''} onClick={()=>setTab('verwalten')}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-      {user?'Verwalten':'Konto'}
-    </button>
+      Verwalten
+    </button>}
+    {!isAdmin&&<button className={''} onClick={()=>user?null:onAuth('login')}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg>
+      {user?'Profil':'Konto'}
+    </button>}
   </nav>;
 }
 
@@ -842,8 +877,8 @@ function ListingFormModal({initial,onClose,onSave}) {
   </div>;
 }
 
-// ── Verwalten page ─────────────────────────────────────────────
-function VerwaltenPage({listings,setListings}) {
+// ── Verwalten — Betriebe tab ────────────────────────────────────
+function BetriebeTab({listings,setListings}) {
   const [filterType,setFilterType]=useState('');
   const [search,setSearch]=useState('');
   const [formItem,setFormItem]=useState(null);
@@ -877,8 +912,7 @@ function VerwaltenPage({listings,setListings}) {
     setDeleting(false); setConfirmDel(null);
   };
 
-  return <div className="nfg-page">
-    <h2 className="nfg-page-h">Verwalten</h2>
+  return <>
     <p className="nfg-page-sub">{listings.length} Einträge in der Datenbank</p>
     <div className="nfg-admin-bar">
       <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
@@ -907,9 +941,7 @@ function VerwaltenPage({listings,setListings}) {
         </div>
       </div>)}
     </div>
-
     {formItem!==null&&<ListingFormModal initial={formItem||null} onClose={()=>setFormItem(null)} onSave={handleSave}/>}
-
     {confirmDel&&<div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&setConfirmDel(null)}>
       <div className="nfg-form-sheet" style={{maxWidth:420}}>
         <h3 style={{margin:'0 0 12px',fontSize:20,fontWeight:700}}>Eintrag löschen?</h3>
@@ -922,6 +954,95 @@ function VerwaltenPage({listings,setListings}) {
         </div>
       </div>
     </div>}
+  </>;
+}
+
+// ── Verwalten — User tab ────────────────────────────────────────
+function UserTab({currentUserId}) {
+  const [users,setUsers]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [confirmDel,setConfirmDel]=useState(null);
+  const [deleting,setDeleting]=useState(false);
+  const [toggling,setToggling]=useState(null);
+
+  useEffect(()=>{
+    setLoading(true);
+    db.from('user_profiles').select('*').order('created_at',{ascending:false})
+      .then(({data})=>{ setUsers(data||[]); setLoading(false); });
+  },[]);
+
+  const toggleRole=async u=>{
+    setToggling(u.id);
+    const newRole=u.role==='admin'?'user':'admin';
+    const{error}=await db.from('user_profiles').update({role:newRole}).eq('id',u.id);
+    if(!error) setUsers(prev=>prev.map(x=>x.id===u.id?{...x,role:newRole}:x));
+    setToggling(null);
+  };
+
+  const handleDelete=async id=>{
+    setDeleting(true);
+    await db.from('user_profiles').delete().eq('id',id);
+    setUsers(prev=>prev.filter(x=>x.id!==id));
+    setDeleting(false); setConfirmDel(null);
+  };
+
+  return <>
+    <p className="nfg-page-sub">{users.length} registrierte User</p>
+    {loading&&<div style={{padding:'32px 0',textAlign:'center',color:'#666'}}>Laden…</div>}
+    {!loading&&users.length===0&&<div className="nfg-empty">Noch keine User registriert.</div>}
+    <div className="nfg-admin-list">
+      {users.map(u=>{
+        const isSelf=u.id===currentUserId;
+        const isAdm=u.role==='admin';
+        return <div key={u.id} className="nfg-admin-item">
+          <div className="nfg-avatar" style={{width:32,height:32,fontSize:13,flexShrink:0}}>{(u.name||'?').charAt(0).toUpperCase()}</div>
+          <div className="nfg-admin-info">
+            <div className="nfg-admin-name">{u.name||'—'}{isSelf&&<span style={{marginLeft:8,fontSize:11,background:'#e0e0e0',borderRadius:4,padding:'1px 6px',fontWeight:600}}>Du</span>}</div>
+            <div className="nfg-admin-meta">Registriert: {fmtDate(u.created_at)}</div>
+          </div>
+          <div className="nfg-admin-actions">
+            <button
+              className={'nfg-btn-sm '+(isAdm?'nfg-btn-sm-edit':'')}
+              style={isAdm?{}:{background:'#f0f0f0',color:'#333',border:'1px solid #ccc'}}
+              disabled={toggling===u.id||isSelf}
+              title={isSelf?'Eigene Rolle kann nicht geändert werden':''}
+              onClick={()=>toggleRole(u)}>
+              {toggling===u.id?'…':isAdm?'Admin':'User'}
+            </button>
+            <button className="nfg-btn-sm nfg-btn-sm-del" disabled={isSelf} title={isSelf?'Eigenen Account nicht löschbar':''} onClick={()=>!isSelf&&setConfirmDel(u)}>Löschen</button>
+          </div>
+        </div>;
+      })}
+    </div>
+    {confirmDel&&<div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&setConfirmDel(null)}>
+      <div className="nfg-form-sheet" style={{maxWidth:420}}>
+        <h3 style={{margin:'0 0 12px',fontSize:20,fontWeight:700}}>User löschen?</h3>
+        <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>„{confirmDel.name}" und alle zugehörigen Daten (Merkliste, Kommentare) werden gelöscht.</p>
+        <div style={{display:'flex',gap:10}}>
+          <button className="nfg-btn-primary" style={{background:'#e53e3e',borderColor:'#e53e3e',color:'#fff'}} disabled={deleting} onClick={()=>handleDelete(confirmDel.id)}>
+            {deleting?'Löschen…':'Endgültig löschen'}
+          </button>
+          <button className="nfg-btn-ghost" onClick={()=>setConfirmDel(null)}>Abbrechen</button>
+        </div>
+      </div>
+    </div>}
+  </>;
+}
+
+// ── Verwalten page ─────────────────────────────────────────────
+function VerwaltenPage({listings,setListings,currentUserId}) {
+  const [vtab,setVtab]=useState('betriebe');
+  return <div className="nfg-page">
+    <h2 className="nfg-page-h">Verwalten</h2>
+    <div style={{display:'flex',gap:4,marginBottom:24,background:'#f0f0f0',borderRadius:12,padding:4,width:'fit-content'}}>
+      {[['betriebe','Betriebe'],['user','User']].map(([id,lbl])=>
+        <button key={id} onClick={()=>setVtab(id)} style={{border:'none',borderRadius:9,padding:'8px 20px',fontFamily:'inherit',fontSize:14,fontWeight:700,cursor:'pointer',background:vtab===id?'#000':'transparent',color:vtab===id?'#fff':'#666',transition:'all 0.15s'}}>
+          {lbl}
+        </button>
+      )}
+    </div>
+    {vtab==='betriebe'&&<BetriebeTab listings={listings} setListings={setListings}/>}
+    {vtab==='user'    &&<UserTab currentUserId={currentUserId}/>}
   </div>;
 }
 
@@ -929,22 +1050,33 @@ function VerwaltenPage({listings,setListings}) {
 function App() {
   const [ready,setReady]=useState(false);
   const [user,setUser]=useState(null);
+  const [userRole,setUserRole]=useState(null);
   const [listings,setListings]=useState([]);
   const [saved,setSaved]=useState([]);
   const [tab,setTab]=useState('guide');
   const [open,setOpen]=useState(null);
   const [authModal,setAuthModal]=useState(null);
 
+  const loadRole=useCallback(async uid=>{
+    if(!uid){setUserRole(null);return;}
+    const {data}=await db.from('user_profiles').select('role').eq('id',uid).single();
+    setUserRole(data?.role||'user');
+  },[]);
+
   useEffect(()=>{
     let authDone=false,listDone=false;
     const check=()=>{ if(authDone&&listDone) setReady(true); };
 
-    db.auth.getSession().then(({data:{session}})=>{
-      setUser(session?.user??null);
+    db.auth.getSession().then(async ({data:{session}})=>{
+      const u=session?.user??null;
+      setUser(u);
+      await loadRole(u?.id??null);
       authDone=true; check();
     });
     const {data:{subscription}}=db.auth.onAuthStateChange((_e,session)=>{
-      setUser(session?.user??null);
+      const u=session?.user??null;
+      setUser(u);
+      loadRole(u?.id??null);
     });
     db.from('unternehmen').select('*').order('name').then(({data})=>{
       if(data) setListings(data);
@@ -964,7 +1096,7 @@ function App() {
 
   const onLogout=useCallback(async()=>{
     await db.auth.signOut();
-    setUser(null); setSaved([]);
+    setUser(null); setSaved([]); setUserRole(null);
     if(tab==='verwalten') setTab('guide');
   },[tab]);
 
@@ -980,21 +1112,22 @@ function App() {
   },[user]);
 
   const shared={listings,saved,onSave,onOpen:setOpen};
+  const isAdmin=userRole==='admin';
 
   if(!ready) return <Loader/>;
 
   return <div className="nfg-shell">
-    <Sidebar tab={tab} setTab={setTab} savedCount={saved.length} user={user} onAuth={onAuth} onLogout={onLogout}/>
+    <Sidebar tab={tab} setTab={setTab} savedCount={saved.length} user={user} isAdmin={isAdmin} onAuth={onAuth} onLogout={onLogout}/>
     <main className="nfg-main">
       {tab==='guide'     &&<GuidePage {...shared}/>}
       {tab==='merkliste' &&<MerklistePage {...shared} user={user} onAuth={onAuth}/>}
       {tab==='mehr'      &&<MehrPage listings={listings}/>}
-      {tab==='verwalten' &&user&&<VerwaltenPage listings={listings} setListings={setListings}/>}
-      {tab==='verwalten' &&!user&&<div className="nfg-page"><h2 className="nfg-page-h">Verwalten</h2><p className="nfg-login-hint">Zum Verwalten von Einträgen bitte einloggen.</p><button className="nfg-btn-primary" onClick={()=>onAuth('login')}>Anmelden</button></div>}
+      {tab==='verwalten' &&isAdmin&&<VerwaltenPage listings={listings} setListings={setListings} currentUserId={user?.id}/>}
+      {tab==='verwalten' &&!isAdmin&&<div className="nfg-page"><h2 className="nfg-page-h">Verwalten</h2><p className="nfg-login-hint">{user?'Du hast keine Berechtigung für die Verwaltung.':'Bitte einloggen.'}</p>{!user&&<button className="nfg-btn-primary" onClick={()=>onAuth('login')}>Anmelden</button>}</div>}
     </main>
-    <MobileNav tab={tab} setTab={setTab} savedCount={saved.length} user={user} onAuth={onAuth}/>
+    <MobileNav tab={tab} setTab={setTab} savedCount={saved.length} user={user} isAdmin={isAdmin} onAuth={onAuth}/>
     {open&&listings.find(x=>x.id===open.id)&&<Profile item={open} listings={listings} onClose={()=>setOpen(null)} saved={saved.includes(open.id)} onSave={onSave} onOpen={setOpen} user={user} onAuth={onAuth}/>}
-    {authModal&&<AuthModal mode={authModal} onClose={()=>setAuthModal(null)} onAuth={u=>{setUser(u);setAuthModal(null);}}/>}
+    {authModal&&<AuthModal mode={authModal} onClose={()=>setAuthModal(null)} onAuth={u=>{setUser(u);setAuthModal(null);loadRole(u?.id??null);}}/>}
   </div>;
 }
 
