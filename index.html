@@ -222,6 +222,21 @@ body { background: var(--nfg-bg); font-family: var(--nfg-sans); color: var(--nfg
   .nfg-admin-actions { flex-direction: column; }
 }
 @media (min-width: 769px) { .nfg-mobile-nav { display: none; } }
+.nfg-img-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.nfg-img-slot { position: relative; aspect-ratio: 1; border: 2px dashed var(--nfg-line); border-radius: 10px; overflow: hidden; cursor: pointer; background: #fafafa; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; transition: border-color 0.15s; }
+.nfg-img-slot:hover { border-color: #999; }
+.nfg-img-slot.has-img { border-style: solid; border-color: #000; }
+.nfg-img-slot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.nfg-img-slot-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #aaa; position: relative; }
+.nfg-img-slot-icon { font-size: 22px; color: #ccc; position: relative; }
+.nfg-img-slot-rm { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; background: rgba(0,0,0,0.75); color: #fff; border: none; border-radius: 50%; font-size: 16px; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2; }
+.nfg-img-uploading { position: absolute; inset: 0; background: rgba(255,255,255,0.8); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #666; z-index: 3; }
+.nfg-real-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nfg-profile-thumb-real { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nfg-btn-link { display: inline-flex; align-items: center; gap: 7px; background: #000; color: #fff; border: 2px solid #000; border-radius: 12px; padding: 11px 20px; font-family: var(--nfg-sans); font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none; }
+.nfg-btn-link:hover { background: #333; }
+.nfg-btn-link.outline { background: transparent; color: #000; }
+.nfg-btn-link.outline:hover { background: #f0f0f0; }
 </style>
 </head>
 <body>
@@ -275,6 +290,10 @@ CREATE TABLE IF NOT EXISTS unternehmen (
   featured BOOLEAN DEFAULT false,
   top50 BOOLEAN DEFAULT false,
   date TEXT,
+  photo_main TEXT,
+  photos TEXT[] DEFAULT '{}',
+  booking_url TEXT,
+  website_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -336,6 +355,22 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- Supabase Storage Bucket für Bilder
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('unternehmen', 'unternehmen', true, 5242880, ARRAY['image/jpeg','image/png','image/webp'])
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Public lesen"     ON storage.objects FOR SELECT USING (bucket_id = 'unternehmen');
+CREATE POLICY "Auth hochladen"   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'unternehmen' AND auth.uid() IS NOT NULL);
+CREATE POLICY "Auth ersetzen"    ON storage.objects FOR UPDATE USING (bucket_id = 'unternehmen' AND auth.uid() IS NOT NULL);
+CREATE POLICY "Auth löschen"     ON storage.objects FOR DELETE USING (bucket_id = 'unternehmen' AND auth.uid() IS NOT NULL);
+
+-- Falls Tabelle bereits existiert: neue Spalten ergänzen
+ALTER TABLE unternehmen ADD COLUMN IF NOT EXISTS photo_main TEXT;
+ALTER TABLE unternehmen ADD COLUMN IF NOT EXISTS photos TEXT[] DEFAULT '{}';
+ALTER TABLE unternehmen ADD COLUMN IF NOT EXISTS booking_url TEXT;
+ALTER TABLE unternehmen ADD COLUMN IF NOT EXISTS website_url TEXT;
 
 -- Admin-User erstellen (Login: admin@naturalfoodguide.ch / PW: Admin)
 DO $$
@@ -569,7 +604,9 @@ function MobileNav({tab,setTab,savedCount,user,isAdmin,onAuth}) {
 function ListingCard({item,onOpen,saved,onSave}) {
   return <article className={'nfg-card'+(item.featured?' featured':'')} onClick={()=>onOpen(item)}>
     <div className="nfg-card-img">
-      <Ph kind={item.image||'forest'} label={`${item.type} · ${item.city}`}/>
+      {item.photo_main
+        ? <img className="nfg-real-img" src={item.photo_main} alt={item.name} style={{height:'180px'}}/>
+        : <Ph kind={item.image||'forest'} label={`${item.type} · ${item.city}`}/>}
       {item.score!=null&&<div className="nfg-score"><b>{item.score}</b><span>/10</span></div>}
       {item.top50&&<div className="nfg-badge-top50">Top 50 Farmers</div>}
       <button className={'nfg-save'+(saved?' on':'')} onClick={e=>{e.stopPropagation();onSave(item.id);}}>
@@ -640,8 +677,12 @@ function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth}) {
     <div className="nfg-profile-sheet">
       <button className="nfg-profile-close" onClick={onClose}>×</button>
       <div className="nfg-profile-hero">
-        <Ph kind={item.image||'forest'} label={`Hero · ${item.name}`} tall/>
-        <div className="nfg-profile-thumbs"><Ph kind="sage"/><Ph kind="clay"/><Ph kind="wheat"/></div>
+        {item.photo_main
+          ? <img src={item.photo_main} alt={item.name} style={{width:'100%',height:280,objectFit:'cover',display:'block'}}/>
+          : <Ph kind={item.image||'forest'} label={`Hero · ${item.name}`} tall/>}
+        {(item.photos||[]).filter(Boolean).length>0&&<div className="nfg-profile-thumbs">
+          {(item.photos||[]).filter(Boolean).slice(0,3).map((u,i)=><div key={i}><img className="nfg-profile-thumb-real" src={u} alt={`Bild ${i+2}`}/></div>)}
+        </div>}
       </div>
       <div className="nfg-profile-body">
         <div className="nfg-profile-meta">
@@ -656,8 +697,9 @@ function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth}) {
         </div>}
         {item.top50&&<div className="nfg-top50-banner"><span className="nfg-top50-icon">★</span><div><b>Top 50 Farmers</b><small>Ausgezeichnet 2026</small></div></div>}
         <div className="nfg-actions">
-          {item.book&&<button className="nfg-btn-primary">Tisch reservieren</button>}
-          <button className={'nfg-btn-ghost'+(liked?' on':'')} onClick={()=>setLiked(l=>!l)}>♥</button>
+          {item.book&&item.booking_url&&<a className="nfg-btn-link" href={item.booking_url} target="_blank" rel="noopener noreferrer">Tisch reservieren ↗</a>}
+          {item.book&&!item.booking_url&&<button className="nfg-btn-primary">Tisch reservieren</button>}
+          {item.website_url&&<a className="nfg-btn-link outline" href={item.website_url} target="_blank" rel="noopener noreferrer">Website ↗</a>}
           <button className={'nfg-btn-ghost'+(saved?' on':'')} onClick={()=>onSave(item.id)}>{saved?'✓ Gespeichert':'Merken'}</button>
         </div>
         {criteria.some(c=>c.met)&&<section className="nfg-section">
@@ -804,13 +846,63 @@ function MehrPage({listings}) {
 }
 
 // ── Listing form modal ─────────────────────────────────────────
-const EMPTY_FORM = {name:'',type:'Restaurant',city:'',region:'',lat:'',lng:'',tags:'',score:'',short:'',book:false,image:'forest',featured:false,date:'',top50:false};
+const EMPTY_FORM = {name:'',type:'Restaurant',city:'',region:'',lat:'',lng:'',tags:'',score:'',short:'',book:false,image:'forest',featured:false,date:'',top50:false,photo_main:'',photos:[],booking_url:'',website_url:''};
+
+// ── Image upload slot ───────────────────────────────────────────
+function ImageSlot({url,label,onUpload,onRemove,itemId,slot}) {
+  const [uploading,setUploading]=useState(false);
+  const ref=React.useRef();
+  const pick=()=>ref.current.click();
+  const onChange=async e=>{
+    const file=e.target.files[0]; if(!file) return;
+    setUploading(true);
+    const ext=file.name.split('.').pop().toLowerCase();
+    const path=`${itemId||'new'}/${slot}_${Date.now()}.${ext}`;
+    const {error}=await db.storage.from('unternehmen').upload(path,file,{upsert:true,contentType:file.type});
+    if(!error){
+      const {data:{publicUrl}}=db.storage.from('unternehmen').getPublicUrl(path);
+      onUpload(publicUrl);
+    }
+    setUploading(false);
+    e.target.value='';
+  };
+  return <div className={'nfg-img-slot'+(url?' has-img':'')} onClick={!url?pick:undefined}>
+    <input ref={ref} type="file" accept="image/*" style={{display:'none'}} onChange={onChange}/>
+    {url&&<img src={url} alt={label}/>}
+    {url&&<button className="nfg-img-slot-rm" type="button" onClick={e=>{e.stopPropagation();onRemove();}}>×</button>}
+    {url&&<button className="nfg-img-slot-rm" type="button" style={{right:30}} onClick={e=>{e.stopPropagation();pick();}}>↑</button>}
+    {!url&&<><span className="nfg-img-slot-icon">+</span><span className="nfg-img-slot-lbl">{label}</span></>}
+    {uploading&&<div className="nfg-img-uploading">Lädt…</div>}
+  </div>;
+}
 
 function ListingFormModal({initial,onClose,onSave}) {
-  const [f,setF]=useState(()=>initial?{...EMPTY_FORM,...initial,tags:Array.isArray(initial.tags)?initial.tags.join(', '):'',score:initial.score!=null?String(initial.score):'',lat:initial.lat?String(initial.lat):'',lng:initial.lng?String(initial.lng):'',date:initial.date||'',book:!!initial.book,featured:!!initial.featured,top50:!!initial.top50}:EMPTY_FORM);
+  const [f,setF]=useState(()=>initial?{
+    ...EMPTY_FORM,...initial,
+    tags:Array.isArray(initial.tags)?initial.tags.join(', '):'',
+    score:initial.score!=null?String(initial.score):'',
+    lat:initial.lat?String(initial.lat):'',
+    lng:initial.lng?String(initial.lng):'',
+    date:initial.date||'',
+    book:!!initial.book,featured:!!initial.featured,top50:!!initial.top50,
+    photo_main:initial.photo_main||'',
+    photos:Array.isArray(initial.photos)?initial.photos:[],
+    booking_url:initial.booking_url||'',
+    website_url:initial.website_url||''
+  }:EMPTY_FORM);
   const [err,setErr]=useState('');
   const [saving,setSaving]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const itemId=initial?.id||(f.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'new');
+
+  const setPhoto=(idx,url)=>{
+    if(idx===0) set('photo_main',url);
+    else setF(p=>{const a=[...(p.photos||[])];a[idx-1]=url;return{...p,photos:a};});
+  };
+  const removePhoto=idx=>{
+    if(idx===0) set('photo_main','');
+    else setF(p=>{const a=[...(p.photos||[])];a[idx-1]='';return{...p,photos:a};});
+  };
 
   const submit=async e=>{
     e.preventDefault();setErr('');
@@ -827,7 +919,11 @@ function ListingFormModal({initial,onClose,onSave}) {
       score:f.score?parseInt(f.score):null,
       short:f.short.trim(),book:f.book,image:f.image,
       featured:f.featured,top50:f.top50,
-      date:f.date.trim()||null
+      date:f.date.trim()||null,
+      photo_main:f.photo_main||null,
+      photos:(f.photos||[]).filter(Boolean),
+      booking_url:f.booking_url.trim()||null,
+      website_url:f.website_url.trim()||null
     };
     const error=await onSave(listing,!!initial);
     setSaving(false);
@@ -851,11 +947,26 @@ function ListingFormModal({initial,onClose,onSave}) {
         </div>
         <div className="nfg-form-row one"><label className="nfg-label">Kurzbeschreibung *<textarea className="nfg-textarea" value={f.short} onChange={e=>set('short',e.target.value)} required placeholder="Kurze Beschreibung des Betriebs…"/></label></div>
         <div className="nfg-form-row one"><label className="nfg-label">Tags (kommagetrennt)<input {...inp} value={f.tags} onChange={e=>set('tags',e.target.value)} placeholder="Bio, Saisonal, Regenerativ"/></label></div>
+
+        <div className="nfg-form-section-h">Bilder</div>
+        <div className="nfg-img-grid">
+          <ImageSlot url={f.photo_main} label="Hauptbild" slot="main" itemId={itemId} onUpload={url=>setPhoto(0,url)} onRemove={()=>removePhoto(0)}/>
+          {[0,1,2].map(i=><ImageSlot key={i} url={(f.photos||[])[i]||''} label={`Bild ${i+2}`} slot={`extra${i+1}`} itemId={itemId} onUpload={url=>setPhoto(i+1,url)} onRemove={()=>removePhoto(i+1)}/>)}
+        </div>
+
         <div className="nfg-form-row">
           <label className="nfg-label">NFG Score (1–10)<input {...inp} type="number" min="1" max="10" value={f.score} onChange={e=>set('score',e.target.value)} placeholder="leer = kein Score"/></label>
-          <label className="nfg-label">Bild-Stil<select {...sel} value={f.image} onChange={e=>set('image',e.target.value)}>{IMAGES.map(i=><option key={i} value={i}>{i}</option>)}</select></label>
+          <label className="nfg-label">Bild-Stil (Fallback)<select {...sel} value={f.image} onChange={e=>set('image',e.target.value)}>{IMAGES.map(i=><option key={i} value={i}>{i}</option>)}</select></label>
         </div>
         {f.type==='Event'&&<div className="nfg-form-row one"><label className="nfg-label">Datum<input {...inp} value={f.date} onChange={e=>set('date',e.target.value)} placeholder="14. Jun 2026"/></label></div>}
+
+        <div className="nfg-form-section-h">Links</div>
+        <div className="nfg-form-row one"><label className="nfg-label">Website URL<input {...inp} type="url" value={f.website_url} onChange={e=>set('website_url',e.target.value)} placeholder="https://restaurant-beispiel.ch"/></label></div>
+        <div className="nfg-form-row one">
+          <label className="nfg-check-lbl" style={{marginBottom:8}}><input type="checkbox" checked={f.book} onChange={e=>set('book',e.target.checked)}/>Tischreservation möglich</label>
+          {f.book&&<label className="nfg-label">Reservierungs-URL<input {...inp} type="url" value={f.booking_url} onChange={e=>set('booking_url',e.target.value)} placeholder="https://restaurant-beispiel.ch/reservieren"/></label>}
+        </div>
+
         <div className="nfg-form-section-h">Koordinaten (optional)</div>
         <div className="nfg-form-row">
           <label className="nfg-label">Breitengrad (lat)<input {...inp} type="number" step="0.001" value={f.lat} onChange={e=>set('lat',e.target.value)} placeholder="47.376"/></label>
@@ -863,7 +974,6 @@ function ListingFormModal({initial,onClose,onSave}) {
         </div>
         <div className="nfg-form-section-h">Optionen</div>
         <div className="nfg-check-row">
-          <label className="nfg-check-lbl"><input type="checkbox" checked={f.book} onChange={e=>set('book',e.target.checked)}/>Reservierung möglich</label>
           <label className="nfg-check-lbl"><input type="checkbox" checked={f.featured} onChange={e=>set('featured',e.target.checked)}/>Featured</label>
           <label className="nfg-check-lbl"><input type="checkbox" checked={f.top50} onChange={e=>set('top50',e.target.checked)}/>Top 50 Farmers</label>
         </div>
