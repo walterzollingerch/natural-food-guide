@@ -175,11 +175,24 @@ body { background: var(--nfg-bg); font-family: var(--nfg-sans); color: var(--nfg
 .nfg-kriterien-note b { color: #000; display: block; margin-bottom: 3px; }
 @media (max-width: 640px) { .nfg-kriterien-grid { grid-template-columns: 1fr; } }
 .nfg-mag { display: flex; flex-direction: column; gap: 10px; }
-.nfg-mag-card { display: flex; gap: 12px; background: var(--nfg-bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--nfg-line); }
-.nfg-mag-card > div:first-child { width: 100px; height: 80px; flex-shrink: 0; }
-.nfg-mag-card > div:last-child { padding: 12px 14px 12px 0; }
-.nfg-mag-kind { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #000; background: var(--nfg-accent); display: inline-block; padding: 2px 7px; border-radius: 999px; }
-.nfg-mag-card h4 { font-weight: 700; margin: 6px 0 0; font-size: 14px; line-height: 1.25; color: #000; }
+.nfg-mag-card { display: flex; gap: 0; background: var(--nfg-bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--nfg-line); transition: box-shadow 0.15s; }
+.nfg-mag-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.09); }
+.nfg-mag-card > .nfg-mag-img { width: 100px; min-height: 80px; flex-shrink: 0; object-fit: cover; display: block; }
+.nfg-mag-card > .nfg-mag-ph { width: 100px; flex-shrink: 0; position: relative; }
+.nfg-mag-body { padding: 12px 14px; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.nfg-mag-card h4 { font-weight: 700; margin: 0; font-size: 14px; line-height: 1.25; color: #000; }
+.nfg-mag-short { font-size: 12px; color: #666; line-height: 1.4; margin: 0; flex: 1; }
+.nfg-mag-footer { margin-top: 6px; }
+.nfg-mag-cta { font-size: 12px; font-weight: 700; color: #000; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.nfg-mag-cta:hover { text-decoration: underline; }
+.nfg-mag-move { display: flex; flex-direction: column; gap: 2px; }
+.nfg-mag-move button { border: 1px solid var(--nfg-line); background: #fff; border-radius: 5px; width: 26px; height: 22px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; color: #333; }
+.nfg-mag-move button:disabled { opacity: 0.3; cursor: default; }
+.nfg-mag-move button:not(:disabled):hover { background: var(--nfg-accent); border-color: var(--nfg-accent); }
+.nfg-doc-slot { border: 2px dashed var(--nfg-line); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; font-size: 13px; cursor: pointer; background: #fafafa; transition: border-color 0.15s; margin-bottom: 4px; }
+.nfg-doc-slot:hover { border-color: #000; }
+.nfg-doc-slot.has-doc { border-style: solid; border-color: #000; background: #f0f7e6; cursor: default; }
+.nfg-doc-icon { font-size: 22px; flex-shrink: 0; }
 .nfg-events { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
 .nfg-events li { display: grid; grid-template-columns: 90px 1fr 20px; gap: 14px; align-items: center; border-top: 1px solid var(--nfg-line); padding-top: 14px; }
 .nfg-events li:first-child { border-top: 0; padding-top: 0; }
@@ -889,8 +902,9 @@ function MerklistePage({listings,saved,onSave,onOpen,user,onAuth}) {
 }
 
 // ── Mehr page ──────────────────────────────────────────────────
-function MehrPage({events}) {
+function MehrPage({events,magazine}) {
   const upcoming=[...events].sort((a,b)=>a.date_start<b.date_start?-1:1);
+  const mags=[...magazine].sort((a,b)=>(a.sort_order??0)-(b.sort_order??0));
   return <div className="nfg-page">
     <h2 className="nfg-page-h">Mehr</h2>
     <div className="nfg-mehr-grid">
@@ -925,7 +939,29 @@ function MehrPage({events}) {
         </div>
         <div className="nfg-kriterien-note"><b>Transparenz</b>Alle Bewertungen basieren auf direkten Gesprächen mit den Restaurants und werden regelmässig aktualisiert. Die Kriterien sind öffentlich einsehbar und nachvollziehbar.</div>
       </section>
-      <section className="nfg-more-card"><h3 className="nfg-more-h">Magazin</h3><div className="nfg-mag">{[{t:'Portrait: Andreas Caminada',k:'Portrait',kind:'forest'},{t:'Editorial: Was heisst regenerativ wirklich?',k:'Editorial',kind:'sage'},{t:'Partner: Soil to Soul Symposium 2026',k:'Partner',kind:'clay'}].map(m=><article key={m.t} className="nfg-mag-card"><div><Ph kind={m.kind} label={m.k}/></div><div><span className="nfg-mag-kind">{m.k}</span><h4>{m.t}</h4></div></article>)}</div></section>
+      <section className="nfg-more-card">
+        <h3 className="nfg-more-h">Magazin</h3>
+        {mags.length===0?<p style={{color:'#666',fontSize:14}}>Noch keine Beiträge.</p>:
+          <div className="nfg-mag">
+            {mags.map(m=>{
+              const href=m.doc_url||m.link;
+              return <article key={m.id} className="nfg-mag-card">
+                {m.image_url
+                  ?<img className="nfg-mag-img" src={m.image_url} alt={m.title}/>
+                  :<div className="nfg-mag-ph"><Ph kind="clay" tall/></div>}
+                <div className="nfg-mag-body">
+                  <h4>{m.title}</h4>
+                  {m.short&&<p className="nfg-mag-short">{m.short}</p>}
+                  {href&&<div className="nfg-mag-footer">
+                    <a className="nfg-mag-cta" href={href} target="_blank" rel="noopener noreferrer">
+                      {m.doc_url?'↓ Dokument':'→ Lesen'}
+                    </a>
+                  </div>}
+                </div>
+              </article>;
+            })}
+          </div>}
+      </section>
       <section className="nfg-more-card">
         <h3 className="nfg-more-h">Eventkalender</h3>
         {upcoming.length===0?<p style={{color:'#666',fontSize:14}}>Keine Events erfasst.</p>:
@@ -1402,13 +1438,196 @@ function UserTab({currentUserId}) {
   </>;
 }
 
+// ── Magazine form modal ────────────────────────────────────────
+const EMPTY_MAG={title:'',short:'',image_url:'',linkType:'link',link:'',doc_url:''};
+
+function MagazineFormModal({initial,onClose,onSave}) {
+  const [f,setF]=useState(()=>initial?{
+    title:initial.title||'',short:initial.short||'',image_url:initial.image_url||'',
+    linkType:initial.doc_url?'doc':'link',link:initial.link||'',doc_url:initial.doc_url||''
+  }:{...EMPTY_MAG});
+  const [err,setErr]=useState('');
+  const [saving,setSaving]=useState(false);
+  const [imgUpl,setImgUpl]=useState(false);
+  const [docUpl,setDocUpl]=useState(false);
+  const imgRef=useRef(), docRef=useRef();
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  const uploadFile=async(file,bucket,path,onDone)=>{
+    const{error}=await db.storage.from(bucket).upload(path,file,{upsert:true,contentType:file.type});
+    if(!error){const{data:{publicUrl}}=db.storage.from(bucket).getPublicUrl(path);onDone(publicUrl);}
+  };
+
+  const onImgChange=async e=>{
+    const file=e.target.files[0]; if(!file) return;
+    setImgUpl(true);
+    const ext=file.name.split('.').pop().toLowerCase();
+    await uploadFile(file,'unternehmen',`magazine/${initial?.id||'new'}_img_${Date.now()}.${ext}`,url=>set('image_url',url));
+    setImgUpl(false); e.target.value='';
+  };
+  const onDocChange=async e=>{
+    const file=e.target.files[0]; if(!file) return;
+    setDocUpl(true);
+    const ext=file.name.split('.').pop().toLowerCase();
+    await uploadFile(file,'unternehmen',`magazine/docs/${initial?.id||'new'}_${Date.now()}.${ext}`,url=>set('doc_url',url));
+    setDocUpl(false); e.target.value='';
+  };
+
+  const submit=async e=>{
+    e.preventDefault(); setErr('');
+    if(!f.title.trim()){setErr('Titel ist erforderlich.');return;}
+    setSaving(true);
+    const payload={title:f.title.trim(),short:f.short.trim(),image_url:f.image_url||null,
+      link:f.linkType==='link'?f.link.trim()||null:null,
+      doc_url:f.linkType==='doc'?f.doc_url||null:null};
+    if(initial?.id) payload.id=initial.id;
+    const errMsg=await onSave(payload,!!initial);
+    setSaving(false);
+    if(errMsg){setErr(errMsg);return;}
+    onClose();
+  };
+
+  const inp={className:'nfg-input'};
+  return <div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&onClose()}>
+    <div className="nfg-form-sheet">
+      <button className="nfg-form-close" onClick={onClose}>×</button>
+      <h2 className="nfg-form-title">{initial?'Beitrag bearbeiten':'Neuer Beitrag'}</h2>
+      <form onSubmit={submit}>
+        <div className="nfg-form-row one"><label className="nfg-label">Titel *<input {...inp} value={f.title} onChange={e=>set('title',e.target.value)} required placeholder="z.B. Portrait: Andreas Caminada"/></label></div>
+        <div className="nfg-form-row one"><label className="nfg-label">Kurzbeschreibung<textarea className="nfg-textarea" rows={3} value={f.short} onChange={e=>set('short',e.target.value)} placeholder="Kurze Beschreibung des Beitrags…"/></label></div>
+
+        <div className="nfg-form-section-h">Bild</div>
+        <input ref={imgRef} type="file" accept="image/*" style={{display:'none'}} onChange={onImgChange}/>
+        <div className={'nfg-img-slot'+(f.image_url?' has-img':'')} style={{height:140,width:'100%',marginBottom:16}} onClick={!f.image_url?()=>imgRef.current.click():undefined}>
+          {f.image_url&&<img src={f.image_url} alt="Bild" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
+          {f.image_url&&<button className="nfg-img-slot-rm" type="button" onClick={e=>{e.stopPropagation();set('image_url','');}}>×</button>}
+          {f.image_url&&<button className="nfg-img-slot-rm" type="button" style={{right:30}} onClick={e=>{e.stopPropagation();imgRef.current.click();}}>↑</button>}
+          {!f.image_url&&<><span className="nfg-img-slot-icon">+</span><span className="nfg-img-slot-lbl">Bild hochladen</span></>}
+          {imgUpl&&<div className="nfg-img-uploading">Lädt…</div>}
+        </div>
+
+        <div className="nfg-form-section-h">Link / Dokument</div>
+        <div style={{display:'flex',gap:20,marginBottom:14}}>
+          {[['link','Website-Link'],['doc','Dokument hochladen']].map(([v,l])=><label key={v} style={{display:'flex',gap:7,alignItems:'center',fontSize:14,cursor:'pointer'}}>
+            <input type="radio" name="ltype" value={v} checked={f.linkType===v} onChange={()=>set('linkType',v)}/>{l}
+          </label>)}
+        </div>
+        {f.linkType==='link'&&<div className="nfg-form-row one"><label className="nfg-label">URL<input {...inp} type="url" value={f.link} onChange={e=>set('link',e.target.value)} placeholder="https://…"/></label></div>}
+        {f.linkType==='doc'&&<>
+          <input ref={docRef} type="file" accept=".pdf,.doc,.docx,.pptx,.key,.pages" style={{display:'none'}} onChange={onDocChange}/>
+          {f.doc_url?<div className="nfg-doc-slot has-doc">
+            <span className="nfg-doc-icon">📄</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:700,fontSize:13}}>Dokument hochgeladen</div>
+              <a href={f.doc_url} target="_blank" rel="noopener noreferrer" className="nfg-link" style={{fontSize:12}}>Vorschau öffnen →</a>
+            </div>
+            <button type="button" className="nfg-btn-sm" style={{background:'#fff',border:'1px solid #ccc',color:'#333'}} onClick={()=>docRef.current.click()}>Ersetzen</button>
+            <button type="button" className="nfg-btn-sm nfg-btn-sm-del" onClick={()=>set('doc_url','')}>×</button>
+          </div>:<div className="nfg-doc-slot" onClick={()=>docRef.current.click()}>
+            <span className="nfg-doc-icon">📁</span>
+            <div><div style={{fontWeight:700,fontSize:13}}>{docUpl?'Lädt…':'Dokument auswählen'}</div><div style={{fontSize:12,color:'#888'}}>PDF, Word, PowerPoint, Keynote</div></div>
+          </div>}
+        </>}
+
+        {err&&<p className="nfg-err" style={{marginTop:12}}>{err}</p>}
+        <div className="nfg-form-actions">
+          <button className="nfg-btn-primary" type="submit" disabled={saving} style={{opacity:saving?0.7:1}}>{saving?'Speichern…':initial?'Speichern':'Beitrag erstellen'}</button>
+          <button className="nfg-btn-ghost" type="button" onClick={onClose}>Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>;
+}
+
+// ── Verwalten — Magazin tab ────────────────────────────────────
+function MagazineTab({magazine,setMagazine}) {
+  const [formItem,setFormItem]=useState(null);
+  const [confirmDel,setConfirmDel]=useState(null);
+  const [deleting,setDeleting]=useState(false);
+  const [moving,setMoving]=useState(null);
+  const sorted=[...magazine].sort((a,b)=>(a.sort_order??0)-(b.sort_order??0));
+
+  const handleSave=async(payload,isEdit)=>{
+    if(isEdit){
+      const{id,...data}=payload;
+      const{data:row,error}=await db.from('magazine').update(data).eq('id',id).select().single();
+      if(error) return error.message;
+      setMagazine(prev=>prev.map(x=>x.id===id?row:x));
+    }else{
+      const maxOrd=magazine.reduce((m,x)=>Math.max(m,x.sort_order??0),-1);
+      const{data:row,error}=await db.from('magazine').insert({...payload,sort_order:maxOrd+1}).select().single();
+      if(error) return error.message;
+      setMagazine(prev=>[...prev,row]);
+    }
+    return null;
+  };
+
+  const handleDelete=async id=>{
+    setDeleting(true);
+    await db.from('magazine').delete().eq('id',id);
+    setMagazine(prev=>prev.filter(x=>x.id!==id));
+    setDeleting(false); setConfirmDel(null);
+  };
+
+  const move=async(idx,dir)=>{
+    const a=sorted[idx], b=sorted[idx+dir]; if(!b) return;
+    setMoving(a.id);
+    const[oA,oB]=[a.sort_order??idx, b.sort_order??(idx+dir)];
+    await db.from('magazine').update({sort_order:oB}).eq('id',a.id);
+    await db.from('magazine').update({sort_order:oA}).eq('id',b.id);
+    setMagazine(prev=>prev.map(x=>x.id===a.id?{...x,sort_order:oB}:x.id===b.id?{...x,sort_order:oA}:x));
+    setMoving(null);
+  };
+
+  return <>
+    <p className="nfg-page-sub">{magazine.length} {magazine.length===1?'Beitrag':'Beiträge'}</p>
+    <div className="nfg-admin-bar"><div/><button className="nfg-btn-primary" onClick={()=>setFormItem(false)}>+ Neuer Beitrag</button></div>
+    {sorted.length===0&&<div className="nfg-empty">Noch keine Beiträge. Erstelle den ersten Magazin-Beitrag.</div>}
+    <div className="nfg-admin-list">
+      {sorted.map((m,i)=><div key={m.id} className="nfg-admin-item">
+        <div className="nfg-mag-move">
+          <button onClick={()=>move(i,-1)} disabled={i===0||moving===m.id} title="Nach oben">▲</button>
+          <button onClick={()=>move(i,1)} disabled={i===sorted.length-1||moving===m.id} title="Nach unten">▼</button>
+        </div>
+        {m.image_url
+          ?<img src={m.image_url} alt={m.title} style={{width:56,height:40,objectFit:'cover',borderRadius:6,flexShrink:0}}/>
+          :<div style={{width:56,height:40,background:'#f0f0f0',borderRadius:6,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>📰</div>}
+        <div className="nfg-admin-info">
+          <div className="nfg-admin-name">{m.title}</div>
+          <div className="nfg-admin-meta">
+            {m.doc_url?'📄 Dokument':m.link?`🔗 ${m.link.replace(/^https?:\/\//,'').slice(0,40)}…`:'Kein Link'}
+            {m.short?` · ${m.short.slice(0,60)}${m.short.length>60?'…':''}` : ''}
+          </div>
+        </div>
+        <div className="nfg-admin-actions">
+          <button className="nfg-btn-sm nfg-btn-sm-edit" onClick={()=>setFormItem(m)}>Bearbeiten</button>
+          <button className="nfg-btn-sm nfg-btn-sm-del" onClick={()=>setConfirmDel(m)}>Löschen</button>
+        </div>
+      </div>)}
+    </div>
+    {formItem!==null&&<MagazineFormModal initial={formItem||null} onClose={()=>setFormItem(null)} onSave={handleSave}/>}
+    {confirmDel&&<div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&setConfirmDel(null)}>
+      <div className="nfg-form-sheet" style={{maxWidth:420}}>
+        <h3 style={{margin:'0 0 12px',fontSize:20,fontWeight:700}}>Beitrag löschen?</h3>
+        <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>„{confirmDel.title}" wird dauerhaft entfernt.</p>
+        <div style={{display:'flex',gap:10}}>
+          <button className="nfg-btn-primary" style={{background:'#e53e3e',borderColor:'#e53e3e',color:'#fff'}} disabled={deleting} onClick={()=>handleDelete(confirmDel.id)}>
+            {deleting?'Löschen…':'Endgültig löschen'}
+          </button>
+          <button className="nfg-btn-ghost" onClick={()=>setConfirmDel(null)}>Abbrechen</button>
+        </div>
+      </div>
+    </div>}
+  </>;
+}
+
 // ── Verwalten page ─────────────────────────────────────────────
-function VerwaltenPage({listings,setListings,currentUserId,events,setEvents}) {
+function VerwaltenPage({listings,setListings,currentUserId,events,setEvents,magazine,setMagazine}) {
   const [vtab,setVtab]=useState('betriebe');
   return <div className="nfg-page">
     <h2 className="nfg-page-h">Verwalten</h2>
-    <div style={{display:'flex',gap:4,marginBottom:24,background:'#f0f0f0',borderRadius:12,padding:4,width:'fit-content'}}>
-      {[['betriebe','Betriebe'],['events','Events'],['user','User']].map(([id,lbl])=>
+    <div style={{display:'flex',gap:4,marginBottom:24,background:'#f0f0f0',borderRadius:12,padding:4,width:'fit-content',flexWrap:'wrap'}}>
+      {[['betriebe','Betriebe'],['events','Events'],['magazin','Magazin'],['user','User']].map(([id,lbl])=>
         <button key={id} onClick={()=>setVtab(id)} style={{border:'none',borderRadius:9,padding:'8px 20px',fontFamily:'inherit',fontSize:14,fontWeight:700,cursor:'pointer',background:vtab===id?'#000':'transparent',color:vtab===id?'#fff':'#666',transition:'all 0.15s'}}>
           {lbl}
         </button>
@@ -1416,6 +1635,7 @@ function VerwaltenPage({listings,setListings,currentUserId,events,setEvents}) {
     </div>
     {vtab==='betriebe'&&<BetriebeTab listings={listings} setListings={setListings}/>}
     {vtab==='events'  &&<EventsTab events={events} setEvents={setEvents}/>}
+    {vtab==='magazin' &&<MagazineTab magazine={magazine} setMagazine={setMagazine}/>}
     {vtab==='user'    &&<UserTab currentUserId={currentUserId}/>}
   </div>;
 }
@@ -1427,6 +1647,7 @@ function App() {
   const [userRole,setUserRole]=useState(null);
   const [listings,setListings]=useState([]);
   const [events,setEvents]=useState([]);
+  const [magazine,setMagazine]=useState([]);
   const [saved,setSaved]=useState([]);
   const savedRef=useRef([]);
   useEffect(()=>{ savedRef.current=saved; },[saved]);
@@ -1461,6 +1682,9 @@ function App() {
     });
     db.from('events').select('*').order('date_start').then(({data})=>{
       if(data) setEvents(data);
+    });
+    db.from('magazine').select('*').order('sort_order').then(({data})=>{
+      if(data) setMagazine(data);
     });
     return ()=>subscription.unsubscribe();
   },[]);
@@ -1500,8 +1724,8 @@ function App() {
     <main className="nfg-main">
       {tab==='guide'     &&<GuidePage {...shared}/>}
       {tab==='merkliste' &&<MerklistePage {...shared} user={user} onAuth={onAuth}/>}
-      {tab==='mehr'      &&<MehrPage events={events}/>}
-      {tab==='verwalten' &&isAdmin&&<VerwaltenPage listings={listings} setListings={setListings} currentUserId={user?.id} events={events} setEvents={setEvents}/>}
+      {tab==='mehr'      &&<MehrPage events={events} magazine={magazine}/>}
+      {tab==='verwalten' &&isAdmin&&<VerwaltenPage listings={listings} setListings={setListings} currentUserId={user?.id} events={events} setEvents={setEvents} magazine={magazine} setMagazine={setMagazine}/>}
       {tab==='verwalten' &&!isAdmin&&<div className="nfg-page"><h2 className="nfg-page-h">Verwalten</h2><p className="nfg-login-hint">{user?'Du hast keine Berechtigung für die Verwaltung.':'Bitte einloggen.'}</p>{!user&&<button className="nfg-btn-primary" onClick={()=>onAuth('login')}>Anmelden</button>}</div>}
     </main>
     <MobileNav tab={tab} setTab={setTab} savedCount={saved.length} user={user} isAdmin={isAdmin} onAuth={onAuth}/>
