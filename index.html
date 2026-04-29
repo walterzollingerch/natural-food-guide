@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <title>Natural Food Guide — by Soil to Soul</title>
 <style>
 :root {
@@ -322,8 +325,9 @@ body { background: var(--nfg-bg); font-family: var(--nfg-sans); color: var(--nfg
    3. Project Settings → API → URL + anon key hier eintragen
    ================================================================ */
 
-window.SUPABASE_URL = 'https://onmekgmbtdvnjszhbhbu.supabase.co';
-window.SUPABASE_KEY = 'sb_publishable_zUymXhSHnW3hJ0JSFPlUKQ_EsJdBq4J';
+window.SUPABASE_URL         = 'https://onmekgmbtdvnjszhbhbu.supabase.co';
+window.SUPABASE_KEY         = 'sb_publishable_zUymXhSHnW3hJ0JSFPlUKQ_EsJdBq4J';
+window.SUPABASE_SERVICE_KEY = ''; // optional: Project Settings → API → service_role key (für User-Erstellung & -Löschung)
 window.NFG_CONFIGURED = !window.SUPABASE_URL.includes('YOUR_PROJECT_ID');
 
 /* ================================================================
@@ -685,6 +689,10 @@ const useLang  = () => useContext(LangCtx);
 const CONFIGURED = window.NFG_CONFIGURED;
 const db = CONFIGURED
   ? window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY)
+  : null;
+// dbAdmin — nur aktiv wenn Service-Key konfiguriert; benötigt für User erstellen/löschen
+const dbAdmin = (CONFIGURED && window.SUPABASE_SERVICE_KEY)
+  ? window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_SERVICE_KEY, {auth:{autoRefreshToken:false,persistSession:false}})
   : null;
 
 const TYPE_COLORS = {'Restaurant':'#d2dc46','Verarbeiter:in':'#059669','Landwirt:in':'#10b981','Laden':'#84cc16','Event':'#8b5cf6'};
@@ -1685,6 +1693,99 @@ function BetriebeTab({listings,setListings}) {
   </>;
 }
 
+// ── Verwalten — User bearbeiten Modal ─────────────────────────
+function UserEditModal({user,isSelf,onClose,onSave}) {
+  const [f,setF]=useState({name:user.name||'',role:user.role||'user'});
+  const [err,setErr]=useState('');
+  const [saving,setSaving]=useState(false);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  const handleSubmit=async e=>{
+    e.preventDefault();
+    if(!f.name.trim()){setErr('Name eingeben.');return;}
+    setSaving(true); setErr('');
+    const result=await onSave(user.id,f);
+    if(result){setErr(result);setSaving(false);}
+    else onClose();
+  };
+
+  return <div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&onClose()}>
+    <div className="nfg-form-sheet" style={{maxWidth:440}}>
+      <button className="nfg-form-close" onClick={onClose}>×</button>
+      <h2 className="nfg-form-title">User bearbeiten</h2>
+      <p style={{fontSize:13,color:'#888',margin:'-16px 0 24px'}}>ID: {user.id.slice(0,8)}… · Registriert: {fmtDate(user.created_at)}</p>
+      <form onSubmit={handleSubmit}>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Name *<input className="nfg-input" value={f.name} onChange={e=>set('name',e.target.value)} placeholder="Maria Muster" required/></label>
+        </div>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">
+            Rolle
+            {isSelf&&<small style={{fontWeight:400,color:'#888',marginLeft:6}}>(eigene Rolle nicht änderbar)</small>}
+            <select className="nfg-input" value={f.role} onChange={e=>set('role',e.target.value)} disabled={isSelf}>
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+        </div>
+        {err&&<p style={{color:'#e53e3e',fontSize:13,margin:'4px 0 12px'}}>{err}</p>}
+        <div style={{display:'flex',gap:10}}>
+          <button type="submit" className="nfg-btn-primary" disabled={saving}>{saving?'Speichern…':'Speichern'}</button>
+          <button type="button" className="nfg-btn-ghost" onClick={onClose}>Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>;
+}
+
+// ── Verwalten — User erstellen Modal ──────────────────────────
+function UserCreateModal({onClose,onSave}) {
+  const [f,setF]=useState({email:'',password:'',name:'',role:'user'});
+  const [err,setErr]=useState('');
+  const [saving,setSaving]=useState(false);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  const handleSubmit=async e=>{
+    e.preventDefault();
+    if(!f.email.trim()||!f.password||!f.name.trim()){setErr('Alle Felder ausfüllen.');return;}
+    if(f.password.length<6){setErr('Passwort mindestens 6 Zeichen.');return;}
+    setSaving(true); setErr('');
+    const result=await onSave(f);
+    if(result){setErr(result);setSaving(false);}
+    else onClose();
+  };
+
+  return <div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&onClose()}>
+    <div className="nfg-form-sheet" style={{maxWidth:440}}>
+      <button className="nfg-form-close" onClick={onClose}>×</button>
+      <h2 className="nfg-form-title">Neuer User</h2>
+      <form onSubmit={handleSubmit}>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Name *<input className="nfg-input" value={f.name} onChange={e=>set('name',e.target.value)} placeholder="Maria Muster" required/></label>
+        </div>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">E-Mail *<input className="nfg-input" type="email" value={f.email} onChange={e=>set('email',e.target.value)} placeholder="maria@example.ch" required/></label>
+        </div>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Passwort * <small style={{fontWeight:400,color:'#888'}}>(min. 6 Zeichen)</small><input className="nfg-input" type="password" value={f.password} onChange={e=>set('password',e.target.value)} placeholder="••••••••" required/></label>
+        </div>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Rolle<select className="nfg-input" value={f.role} onChange={e=>set('role',e.target.value)}>
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select></label>
+        </div>
+        {!dbAdmin&&<p style={{fontSize:12,color:'#888',background:'#f0f0f0',borderRadius:8,padding:'10px 12px',margin:'0 0 12px',lineHeight:1.5}}>ℹ Kein Service-Key konfiguriert — der neue User erhält eine Bestätigungs-E-Mail und muss seinen Account selbst aktivieren.</p>}
+        {err&&<p style={{color:'#e53e3e',fontSize:13,margin:'4px 0 12px'}}>{err}</p>}
+        <div style={{display:'flex',gap:10}}>
+          <button type="submit" className="nfg-btn-primary" disabled={saving}>{saving?'Erstellen…':'User erstellen'}</button>
+          <button type="button" className="nfg-btn-ghost" onClick={onClose}>Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>;
+}
+
 // ── Verwalten — User tab ────────────────────────────────────────
 function UserTab({currentUserId}) {
   const [users,setUsers]=useState([]);
@@ -1692,12 +1793,16 @@ function UserTab({currentUserId}) {
   const [confirmDel,setConfirmDel]=useState(null);
   const [deleting,setDeleting]=useState(false);
   const [toggling,setToggling]=useState(null);
+  const [showCreate,setShowCreate]=useState(false);
+  const [editUser,setEditUser]=useState(null);
 
-  useEffect(()=>{
+  const reload=()=>{
     setLoading(true);
     db.from('user_profiles').select('*').order('created_at',{ascending:false})
       .then(({data})=>{ setUsers(data||[]); setLoading(false); });
-  },[]);
+  };
+
+  useEffect(()=>{ reload(); },[]);
 
   const toggleRole=async u=>{
     setToggling(u.id);
@@ -1707,15 +1812,51 @@ function UserTab({currentUserId}) {
     setToggling(null);
   };
 
+  const handleEdit=async(id,{name,role})=>{
+    const{error}=await db.from('user_profiles').update({name,role}).eq('id',id);
+    if(error) return error.message;
+    setUsers(prev=>prev.map(x=>x.id===id?{...x,name,role}:x));
+    return null;
+  };
+
+  const handleCreate=async({email,password,name,role})=>{
+    let uid=null;
+    if(dbAdmin){
+      // Service-Key vorhanden: User direkt anlegen, E-Mail-Bestätigung überspringen
+      const{data,error}=await dbAdmin.auth.admin.createUser({
+        email,password,user_metadata:{name},email_confirm:true
+      });
+      if(error) return error.message;
+      uid=data.user.id;
+    } else {
+      // Fallback: signUp — User erhält Bestätigungs-E-Mail
+      const{data,error}=await db.auth.signUp({email,password,options:{data:{name}}});
+      if(error) return error.message;
+      uid=data?.user?.id||null;
+    }
+    // Profil-Rolle setzen (Trigger legt Profil mit role='user' an — hier ggf. auf 'admin' aktualisieren)
+    if(uid && role==='admin'){
+      await db.from('user_profiles').update({role:'admin'}).eq('id',uid);
+    }
+    reload();
+    return null;
+  };
+
   const handleDelete=async id=>{
     setDeleting(true);
+    // Profil löschen (cascadiert zu saved_items, kommentare via FK oder manuell)
     await db.from('user_profiles').delete().eq('id',id);
+    // Auth-Datensatz löschen — nur möglich wenn Service-Key konfiguriert
+    if(dbAdmin) await dbAdmin.auth.admin.deleteUser(id);
     setUsers(prev=>prev.filter(x=>x.id!==id));
     setDeleting(false); setConfirmDel(null);
   };
 
   return <>
-    <p className="nfg-page-sub">{users.length} registrierte User</p>
+    <div className="nfg-admin-bar">
+      <p className="nfg-page-sub" style={{margin:0}}>{users.length} registrierte User</p>
+      <button className="nfg-btn-primary" onClick={()=>setShowCreate(true)}>+ Neuer User</button>
+    </div>
     {loading&&<div style={{padding:'32px 0',textAlign:'center',color:'#666'}}>Laden…</div>}
     {!loading&&users.length===0&&<div className="nfg-empty">Noch keine User registriert.</div>}
     <div className="nfg-admin-list">
@@ -1725,27 +1866,29 @@ function UserTab({currentUserId}) {
         return <div key={u.id} className="nfg-admin-item">
           <div className="nfg-avatar" style={{width:32,height:32,fontSize:13,flexShrink:0}}>{(u.name||'?').charAt(0).toUpperCase()}</div>
           <div className="nfg-admin-info">
-            <div className="nfg-admin-name">{u.name||'—'}{isSelf&&<span style={{marginLeft:8,fontSize:11,background:'#e0e0e0',borderRadius:4,padding:'1px 6px',fontWeight:600}}>Du</span>}</div>
+            <div className="nfg-admin-name">
+              {u.name||'—'}
+              {isSelf&&<span style={{marginLeft:8,fontSize:11,background:'#e0e0e0',borderRadius:4,padding:'1px 6px',fontWeight:600}}>Du</span>}
+              <span style={{marginLeft:8,fontSize:11,borderRadius:4,padding:'1px 6px',fontWeight:600,background:isAdm?'#000':'#f0f0f0',color:isAdm?'#d2dc46':'#666'}}>{isAdm?'Admin':'User'}</span>
+            </div>
             <div className="nfg-admin-meta">Registriert: {fmtDate(u.created_at)}</div>
           </div>
           <div className="nfg-admin-actions">
-            <button
-              className={'nfg-btn-sm '+(isAdm?'nfg-btn-sm-edit':'')}
-              style={isAdm?{}:{background:'#f0f0f0',color:'#333',border:'1px solid #ccc'}}
-              disabled={toggling===u.id||isSelf}
-              title={isSelf?'Eigene Rolle kann nicht geändert werden':''}
-              onClick={()=>toggleRole(u)}>
-              {toggling===u.id?'…':isAdm?'Admin':'User'}
-            </button>
+            <button className="nfg-btn-sm nfg-btn-sm-edit" onClick={()=>setEditUser(u)}>Bearbeiten</button>
             <button className="nfg-btn-sm nfg-btn-sm-del" disabled={isSelf} title={isSelf?'Eigenen Account nicht löschbar':''} onClick={()=>!isSelf&&setConfirmDel(u)}>Löschen</button>
           </div>
         </div>;
       })}
     </div>
+    {editUser&&<UserEditModal user={editUser} isSelf={editUser.id===currentUserId} onClose={()=>setEditUser(null)} onSave={handleEdit}/>}
+    {showCreate&&<UserCreateModal onClose={()=>setShowCreate(false)} onSave={handleCreate}/>}
     {confirmDel&&<div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&setConfirmDel(null)}>
       <div className="nfg-form-sheet" style={{maxWidth:420}}>
         <h3 style={{margin:'0 0 12px',fontSize:20,fontWeight:700}}>User löschen?</h3>
-        <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>„{confirmDel.name}" und alle zugehörigen Daten (Merkliste, Kommentare) werden gelöscht.</p>
+        <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>
+          „{confirmDel.name}" wird gelöscht.
+          {!dbAdmin&&<><br/><br/><span style={{color:'#b45309'}}>⚠ Kein Service-Key konfiguriert — nur das Profil wird gelöscht. Den Auth-Datensatz bitte im Supabase Dashboard entfernen (Authentication → Users).</span></>}
+        </p>
         <div style={{display:'flex',gap:10}}>
           <button className="nfg-btn-primary" style={{background:'#e53e3e',borderColor:'#e53e3e',color:'#fff'}} disabled={deleting} onClick={()=>handleDelete(confirmDel.id)}>
             {deleting?'Löschen…':'Endgültig löschen'}
