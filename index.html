@@ -207,6 +207,17 @@ body { background: var(--nfg-bg); font-family: var(--nfg-sans); color: var(--nfg
 .nfg-card-like { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #bbb; border: none; background: none; padding: 2px 0; cursor: pointer; font-family: var(--nfg-sans); transition: color 0.12s; flex-shrink: 0; }
 .nfg-card-like.on { color: #d0003e; }
 .nfg-card-like:not(.on):hover { color: #d0003e; }
+.nfg-lang-toggle { display: flex; gap: 4px; padding: 4px; background: #f0f0f0; border-radius: 8px; margin-bottom: 12px; }
+.nfg-lang-toggle button { flex: 1; border: none; border-radius: 5px; padding: 5px 0; font-size: 12px; font-weight: 700; cursor: pointer; font-family: var(--nfg-sans); transition: all 0.15s; background: transparent; color: #666; }
+.nfg-lang-toggle button.on { background: #fff; color: #000; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+.nfg-sprach-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.nfg-sprach-table th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #666; border-bottom: 2px solid var(--nfg-line); }
+.nfg-sprach-table td { padding: 7px 10px; border-bottom: 1px solid var(--nfg-line); vertical-align: middle; }
+.nfg-sprach-table tr:last-child td { border-bottom: 0; }
+.nfg-sprach-de { color: #888; font-size: 12px; max-width: 200px; }
+.nfg-sprach-key { font-family: monospace; font-size: 11px; color: #999; }
+.nfg-sprach-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.nfg-sprach-section { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #666; margin: 24px 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--nfg-line); }
 .nfg-analytics-sum { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 12px; margin-bottom: 24px; }
 .nfg-stat-card { background: #fff; border: 1px solid var(--nfg-line); border-radius: 14px; padding: 16px 18px; }
 .nfg-stat-icon { font-size: 20px; display: block; margin-bottom: 8px; }
@@ -504,11 +515,115 @@ BEGIN
 END;
 $$;
 
+-- ================================================================
+-- Tabelle: Übersetzungen (DE = Pflicht, EN = optional, Fallback auf DE)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS translations (
+  key        TEXT PRIMARY KEY,
+  page       TEXT NOT NULL,
+  de         TEXT NOT NULL,
+  en         TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE translations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Alle lesen"      ON translations FOR SELECT USING (true);
+CREATE POLICY "Admins schreiben" ON translations FOR ALL USING (
+  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+);
+
+INSERT INTO translations (key,page,de,en) VALUES
+('nav.guide','nav','Guide','Guide'),
+('nav.merkliste','nav','Merkliste','Saved'),
+('nav.mehr','nav','Mehr','More'),
+('nav.verwalten','nav','Verwalten','Admin'),
+('nav.konto','nav','Konto','Account'),
+('nav.profil','nav','Profil','Profile'),
+('nav.logout','nav','Abmelden','Sign Out'),
+('nav.login','nav','Anmelden','Sign In'),
+('common.cancel','common','Abbrechen','Cancel'),
+('common.save','common','Speichern','Save'),
+('common.loading','common','Lädt…','Loading…'),
+('common.edit','common','Bearbeiten','Edit'),
+('common.delete','common','Löschen','Delete'),
+('common.new','common','Neu','New'),
+('guide.search','guide','Suche nach Name, Stadt, Tag…','Search name, city, tag…'),
+('guide.all_locations','guide','Alle Standorte','All locations'),
+('guide.list_view','guide','Liste','List'),
+('guide.map_view','guide','Karte','Map'),
+('guide.mixed','guide','gemischt','mixed'),
+('guide.no_results','guide','Keine Treffer. Filter anpassen.','No results. Adjust filters.'),
+('guide.no_entries','guide','Noch keine Einträge. Gehe zu «Verwalten» um Betriebe hinzuzufügen.','No entries yet. Go to Admin to add businesses.'),
+('guide.map_hint','guide','Tipp: Pin anklicken für Kurzinfo.','Tip: Click a pin for details.'),
+('guide.profile_link','guide','Profil →','Profile →'),
+('profile.reserve','profile','Tisch reservieren ↗','Reserve a Table ↗'),
+('profile.website','profile','Website ↗','Website ↗'),
+('profile.save','profile','Merken','Save'),
+('profile.saved','profile','✓ Gespeichert','✓ Saved'),
+('profile.like','profile','Gefällt mir','Like'),
+('profile.contact','profile','Kontakt','Contact'),
+('profile.criteria_met','profile','Erfüllte Kriterien','Met Criteria'),
+('profile.tags','profile','Tags','Tags'),
+('profile.relations','profile','Beziehungen','Relations'),
+('profile.sources','profile','Bezieht von','Sources from'),
+('profile.delivers','profile','Liefert an','Delivers to'),
+('profile.comments_h','profile','Kommentare & Bewertungen','Comments & Reviews'),
+('profile.your_rating','profile','Deine Bewertung','Your Rating'),
+('profile.comment_ph','profile','Was hast du erlebt?…','What was your experience?…'),
+('profile.post_comment','profile','Kommentar posten','Post Comment'),
+('profile.loading_comments','profile','Lade Kommentare…','Loading comments…'),
+('profile.no_comments','profile','Noch keine Kommentare. Sei der Erste!','No comments yet. Be the first!'),
+('profile.login_to_comment','profile','Anmelden um zu kommentieren und zu bewerten.','Sign in to comment and rate.'),
+('profile.sign_in','profile','Anmelden / Registrieren','Sign In / Register'),
+('profile.rating_lbl','profile','NFG-Bewertung','NFG Rating'),
+('profile.criteria_link','profile','Kriterien →','Criteria →'),
+('merkliste.title','merkliste','Meine Merkliste','My Saved List'),
+('merkliste.login_hint','merkliste','Speichere Betriebe in deine persönliche Merkliste. Anmeldung erforderlich.','Save businesses to your personal list. Login required.'),
+('merkliste.sign_in','merkliste','Anmelden','Sign In'),
+('merkliste.register','merkliste','Konto erstellen','Create Account'),
+('merkliste.empty','merkliste','Noch nichts gespeichert. Im Guide Einträge mit ♡ markieren.','Nothing saved yet. Mark entries with ♡ in the Guide.'),
+('mehr.title','mehr','Mehr','More'),
+('mehr.about_title','mehr','Was ist der Natural Food Guide?','What is the Natural Food Guide?'),
+('mehr.about_text','mehr','Ein kuratierter Guide für Restaurants, Verarbeiter:innen, Höfe, Läden sowie Pop-Ups & Events in der Schweiz, die mit Boden, Saison und Herkunft konsequent umgehen.','A curated guide to restaurants, producers, farms, shops, pop-ups & events in Switzerland that prioritize soil, seasonality, and origin.'),
+('mehr.about_link','mehr','Über uns →','About us →'),
+('mehr.criteria_title','mehr','Bewertungskriterien','Rating Criteria'),
+('mehr.criteria_intro','mehr','Restaurants im Natural Food Guide werden nach einem transparenten Kriterienkatalog bewertet. Die Bewertung erfolgt in den Kategorien «Küche» und «Restaurant & Betrieb».','Restaurants in the Natural Food Guide are assessed using a transparent criteria catalogue in the categories "Kitchen" and "Restaurant & Operations".'),
+('mehr.magazine_title','mehr','Magazin','Magazine'),
+('mehr.events_title','mehr','Eventkalender','Event Calendar'),
+('mehr.no_magazine','mehr','Noch keine Beiträge.','No articles yet.'),
+('mehr.no_events','mehr','Keine Events erfasst.','No events listed.'),
+('mehr.read','mehr','→ Lesen','→ Read'),
+('mehr.document','mehr','↓ Dokument','↓ Document'),
+('mehr.pts_3','mehr','wird grösstenteils eingehalten','largely met'),
+('mehr.pts_2','mehr','wird mehrheitlich eingehalten, bis auf wenige Ausnahmen','mostly met, with few exceptions'),
+('mehr.pts_1','mehr','wird nur wenig darauf geachtet','rarely considered'),
+('mehr.transparency','mehr','Transparenz','Transparency'),
+('mehr.transparency_text','mehr','Alle Bewertungen basieren auf direkten Gesprächen mit den Restaurants und werden regelmässig aktualisiert. Die Kriterien sind öffentlich einsehbar und nachvollziehbar.','All ratings are based on direct conversations with the restaurants and updated regularly. The criteria are publicly viewable and verifiable.'),
+('mehr.bonus_title','mehr','Bonuspunkte','Bonus Points'),
+('auth.login_title','auth','Anmelden','Sign In'),
+('auth.register_title','auth','Registrieren','Register'),
+('auth.email','auth','E-Mail','Email'),
+('auth.password','auth','Passwort','Password'),
+('auth.name','auth','Name','Name'),
+('auth.sign_in','auth','Anmelden','Sign In'),
+('auth.create_account','auth','Konto erstellen','Create Account'),
+('auth.no_account','auth','Noch kein Konto?','No account yet?'),
+('auth.have_account','auth','Bereits registriert?','Already registered?'),
+('auth.register_link','auth','Registrieren','Register'),
+('auth.login_link','auth','Anmelden','Sign In'),
+('auth.merken_hint','auth','Bitte melde dich an, um Betriebe zu merken.','Please sign in to save businesses.'),
+('auth.wrong_creds','auth','E-Mail oder Passwort falsch.','Incorrect email or password.'),
+('auth.confirm_email','auth','Bestätigungs-E-Mail gesendet. Bitte prüfe dein Postfach.','Confirmation email sent. Please check your inbox.')
+ON CONFLICT (key) DO UPDATE SET de=EXCLUDED.de, en=COALESCE(translations.en,EXCLUDED.en);
+
 ================================================================ */
 </script>
 
 <script type="text/babel">
-const { useState, useEffect, useMemo, useCallback, useRef } = React;
+const { useState, useEffect, useMemo, useCallback, useRef, createContext, useContext } = React;
+
+// ── Language context ───────────────────────────────────────────
+const LangCtx = createContext({locale:'DE', setLocale:()=>{}, t:(k,f)=>f||k});
+const useLang  = () => useContext(LangCtx);
 
 const CONFIGURED = window.NFG_CONFIGURED;
 const db = CONFIGURED
@@ -617,6 +732,7 @@ function Loader() {
 
 // ── Auth modal ─────────────────────────────────────────────────
 function AuthModal({mode='login',hint,onClose,onAuth}) {
+  const {t}=useLang();
   const [view,setView]=useState(mode);
   const [name,setName]=useState('');
   const [email,setEmail]=useState('');
@@ -628,7 +744,7 @@ function AuthModal({mode='login',hint,onClose,onAuth}) {
     e.preventDefault(); setErr(''); setLoading(true);
     const {data,error} = await db.auth.signInWithPassword({email:email.trim(),password:pw});
     setLoading(false);
-    if (error) { setErr(error.message==='Invalid login credentials'?'E-Mail oder Passwort falsch.':error.message); return; }
+    if (error) { setErr(error.message==='Invalid login credentials'?t('auth.wrong_creds','E-Mail oder Passwort falsch.'):error.message); return; }
     onAuth(data.user); onClose();
   };
   const doRegister = async e => {
@@ -636,7 +752,7 @@ function AuthModal({mode='login',hint,onClose,onAuth}) {
     const {data,error} = await db.auth.signUp({email:email.trim(),password:pw,options:{data:{name:name.trim()}}});
     setLoading(false);
     if (error) { setErr(error.message); return; }
-    if (data.user && !data.session) { setErr('Bestätigungs-E-Mail gesendet. Bitte prüfe dein Postfach.'); return; }
+    if (data.user && !data.session) { setErr(t('auth.confirm_email','Bestätigungs-E-Mail gesendet. Bitte prüfe dein Postfach.')); return; }
     onAuth(data.user); onClose();
   };
   const swap = () => { setView(v=>v==='login'?'register':'login'); setErr(''); };
@@ -648,20 +764,20 @@ function AuthModal({mode='login',hint,onClose,onAuth}) {
       {hint&&<div style={{background:'#f0f7e6',border:'1.5px solid #b6d97a',borderRadius:10,padding:'10px 14px',marginBottom:20,fontSize:13,color:'#3a5a00',display:'flex',alignItems:'center',gap:8}}>
         <span style={{fontSize:16}}>🔒</span>{hint}
       </div>}
-      <h2 style={{margin:'0 0 4px',fontSize:26,fontWeight:700}}>{view==='login'?'Anmelden':'Registrieren'}</h2>
+      <h2 style={{margin:'0 0 4px',fontSize:26,fontWeight:700}}>{view==='login'?t('auth.login_title','Anmelden'):t('auth.register_title','Registrieren')}</h2>
       <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>Natural Food Guide · Soil to Soul</p>
       <form onSubmit={view==='login'?doLogin:doRegister} style={{display:'flex',flexDirection:'column',gap:14}}>
-        {view==='register'&&<label className="nfg-label">Name<input {...inp} value={name} onChange={e=>setName(e.target.value)} required placeholder="Maria Muster"/></label>}
-        <label className="nfg-label">E-Mail<input {...inp} type="email" value={email} onChange={e=>setEmail(e.target.value)} required placeholder="maria@example.ch"/></label>
-        <label className="nfg-label">Passwort<input {...inp} type="password" value={pw} onChange={e=>setPw(e.target.value)} required placeholder="Mind. 6 Zeichen" minLength={6}/></label>
+        {view==='register'&&<label className="nfg-label">{t('auth.name','Name')}<input {...inp} value={name} onChange={e=>setName(e.target.value)} required placeholder="Maria Muster"/></label>}
+        <label className="nfg-label">{t('auth.email','E-Mail')}<input {...inp} type="email" value={email} onChange={e=>setEmail(e.target.value)} required placeholder="maria@example.ch"/></label>
+        <label className="nfg-label">{t('auth.password','Passwort')}<input {...inp} type="password" value={pw} onChange={e=>setPw(e.target.value)} required placeholder="Mind. 6 Zeichen" minLength={6}/></label>
         {err&&<p className="nfg-err">{err}</p>}
         <button className="nfg-btn-primary" type="submit" disabled={loading} style={{opacity:loading?0.7:1}}>
-          {loading?'…':view==='login'?'Anmelden':'Konto erstellen'}
+          {loading?t('common.loading','Lädt…'):view==='login'?t('auth.sign_in','Anmelden'):t('auth.create_account','Konto erstellen')}
         </button>
       </form>
       <p className="nfg-auth-switch">
-        {view==='login'?'Noch kein Konto?':'Bereits registriert?'}{' '}
-        <button onClick={swap}>{view==='login'?'Registrieren':'Anmelden'}</button>
+        {view==='login'?t('auth.no_account','Noch kein Konto?'):t('auth.have_account','Bereits registriert?')}{' '}
+        <button onClick={swap}>{view==='login'?t('auth.register_link','Registrieren'):t('auth.login_link','Anmelden')}</button>
       </p>
     </div>
   </div>;
@@ -669,11 +785,12 @@ function AuthModal({mode='login',hint,onClose,onAuth}) {
 
 // ── Sidebar ────────────────────────────────────────────────────
 function Sidebar({tab,setTab,savedCount,user,isAdmin,onAuth,onLogout}) {
+  const {t,locale,setLocale}=useLang();
   const navItems = [
-    {id:'guide',   label:'Guide',    icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v16M15 6v16"/></svg>},
-    {id:'merkliste',label:'Merkliste',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill={tab==='merkliste'?'currentColor':'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>},
-    {id:'mehr',    label:'Mehr',     icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>},
-    ...(isAdmin?[{id:'verwalten',label:'Verwalten',icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>}]:[])
+    {id:'guide',   label:t('nav.guide','Guide'),     icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v16M15 6v16"/></svg>},
+    {id:'merkliste',label:t('nav.merkliste','Merkliste'),icon:<svg width="18" height="18" viewBox="0 0 24 24" fill={tab==='merkliste'?'currentColor':'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>},
+    {id:'mehr',    label:t('nav.mehr','Mehr'),        icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>},
+    ...(isAdmin?[{id:'verwalten',label:t('nav.verwalten','Verwalten'),icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>}]:[])
   ];
   return <aside className="nfg-sidebar">
     <div className="nfg-sidebar-brand">
@@ -687,6 +804,10 @@ function Sidebar({tab,setTab,savedCount,user,isAdmin,onAuth,onLogout}) {
       </button>)}
     </nav>
     <div className="nfg-sidebar-foot">
+      <div className="nfg-lang-toggle">
+        <button className={locale==='DE'?'on':''} onClick={()=>setLocale('DE')}>DE</button>
+        <button className={locale==='EN'?'on':''} onClick={()=>setLocale('EN')}>EN</button>
+      </div>
       {user ? <>
         <div className="nfg-sidebar-user">
           <div className="nfg-avatar">{userInit(user)}</div>
@@ -697,33 +818,34 @@ function Sidebar({tab,setTab,savedCount,user,isAdmin,onAuth,onLogout}) {
         </div>
         <button className="nfg-sidebar-btn" style={{fontSize:13,padding:'8px 12px'}} onClick={onLogout}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-          Abmelden
+          {t('nav.logout','Abmelden')}
         </button>
-      </> : <button className="nfg-btn-primary" style={{width:'100%'}} onClick={()=>onAuth('login')}>Anmelden</button>}
+      </> : <button className="nfg-btn-primary" style={{width:'100%'}} onClick={()=>onAuth('login')}>{t('nav.login','Anmelden')}</button>}
     </div>
   </aside>;
 }
 
 // ── Mobile nav ─────────────────────────────────────────────────
 function MobileNav({tab,setTab,savedCount,user,isAdmin,onAuth}) {
+  const {t,locale,setLocale}=useLang();
   return <nav className="nfg-mobile-nav">
     <button className={tab==='guide'?'on':''} onClick={()=>setTab('guide')}>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v16M15 6v16"/></svg>Guide
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v16M15 6v16"/></svg>{t('nav.guide','Guide')}
     </button>
     <button className={tab==='merkliste'?'on':''} onClick={()=>setTab('merkliste')}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill={tab==='merkliste'?'currentColor':'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-      Merkliste{savedCount>0&&<span className="nfg-mobile-badge">{savedCount}</span>}
+      {t('nav.merkliste','Merkliste')}{savedCount>0&&<span className="nfg-mobile-badge">{savedCount}</span>}
     </button>
     <button className={tab==='mehr'?'on':''} onClick={()=>setTab('mehr')}>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>Mehr
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>{t('nav.mehr','Mehr')}
     </button>
     {isAdmin&&<button className={(tab==='verwalten')?'on':''} onClick={()=>setTab('verwalten')}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-      Verwalten
+      {t('nav.verwalten','Verwalten')}
     </button>}
     {!isAdmin&&<button className={''} onClick={()=>user?null:onAuth('login')}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg>
-      {user?'Profil':'Konto'}
+      {user?t('nav.profil','Profil'):t('nav.konto','Konto')}
     </button>}
   </nav>;
 }
@@ -770,6 +892,7 @@ const NFG_RELATIONS = {
 };
 
 function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth,liked,likeCount,onLike,onTrack}) {
+  const {t}=useLang();
   const rel = NFG_RELATIONS[item.id]||{sources:[],delivers:[]};
   const byId = id => listings.find(x=>x.id===id);
   const [comments,setComments]=useState([]);
@@ -826,21 +949,21 @@ function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth,liked,li
         <p className="nfg-profile-short">{item.short}</p>
         {item.score!=null&&<div className="nfg-profile-score">
           <div className="nfg-profile-score-num"><b>{item.score}</b><span>/10</span></div>
-          <div><div className="nfg-profile-score-lbl">NFG-Bewertung</div><a href="#kriterien" className="nfg-link">Kriterien →</a></div>
+          <div><div className="nfg-profile-score-lbl">{t('profile.rating_lbl','NFG-Bewertung')}</div><a href="#kriterien" className="nfg-link">{t('profile.criteria_link','Kriterien →')}</a></div>
         </div>}
         {item.top50&&<div className="nfg-top50-banner"><span className="nfg-top50-icon">★</span><div><b>Top 50 Farmers</b><small>Ausgezeichnet 2026</small></div></div>}
         <div className="nfg-actions">
-          {item.book&&item.booking_url&&<a className="nfg-btn-link" href={item.booking_url} target="_blank" rel="noopener noreferrer" onClick={()=>onTrack('booking_click',item.id)}>Tisch reservieren ↗</a>}
-          {item.book&&!item.booking_url&&<button className="nfg-btn-primary">Tisch reservieren</button>}
-          {item.website_url&&<a className="nfg-btn-link outline" href={item.website_url} target="_blank" rel="noopener noreferrer">Website ↗</a>}
-          <button className={'nfg-btn-ghost'+(saved?' on':'')} onClick={()=>onSave(item.id)}>{saved?'✓ Gespeichert':'Merken'}</button>
+          {item.book&&item.booking_url&&<a className="nfg-btn-link" href={item.booking_url} target="_blank" rel="noopener noreferrer" onClick={()=>onTrack('booking_click',item.id)}>{t('profile.reserve','Tisch reservieren ↗')}</a>}
+          {item.book&&!item.booking_url&&<button className="nfg-btn-primary">{t('profile.reserve','Tisch reservieren ↗')}</button>}
+          {item.website_url&&<a className="nfg-btn-link outline" href={item.website_url} target="_blank" rel="noopener noreferrer">{t('profile.website','Website ↗')}</a>}
+          <button className={'nfg-btn-ghost'+(saved?' on':'')} onClick={()=>onSave(item.id)}>{saved?t('profile.saved','✓ Gespeichert'):t('profile.save','Merken')}</button>
           <button className={'nfg-like-btn'+(liked?' on':'')} onClick={()=>onLike(item.id)}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill={liked?'currentColor':'none'} stroke="currentColor" strokeWidth="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            {liked?'Gefällt mir':'Gefällt mir'}{likeCount>0&&<span style={{fontWeight:400,marginLeft:2}}>({likeCount})</span>}
+            {t('profile.like','Gefällt mir')}{likeCount>0&&<span style={{fontWeight:400,marginLeft:2}}>({likeCount})</span>}
           </button>
         </div>
         {(item.address||item.phone||item.email)&&<section className="nfg-section">
-          <h3 className="nfg-section-h">Kontakt</h3>
+          <h3 className="nfg-section-h">{t('profile.contact','Kontakt')}</h3>
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {item.address&&<div style={{display:'flex',gap:10,alignItems:'flex-start',fontSize:14,color:'#444'}}>
               <span style={{fontSize:16}}>📍</span><span>{item.address}</span>
@@ -856,33 +979,33 @@ function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth,liked,li
           </div>
         </section>}
         {criteria.some(c=>c.met)&&<section className="nfg-section">
-          <h3 className="nfg-section-h">Erfüllte Kriterien</h3>
+          <h3 className="nfg-section-h">{t('profile.criteria_met','Erfüllte Kriterien')}</h3>
           <ul className="nfg-criteria">{criteria.filter(c=>c.met).map(c=><li key={c.k}><span className="nfg-check">✓</span>{c.k}</li>)}</ul>
         </section>}
         <section className="nfg-section">
-          <h3 className="nfg-section-h">Tags</h3>
+          <h3 className="nfg-section-h">{t('profile.tags','Tags')}</h3>
           <div className="nfg-card-tags">{(item.tags||[]).map(t=><span key={t} className="nfg-card-tag">{t}</span>)}</div>
         </section>
         {(rel.sources.length>0||rel.delivers.length>0)&&<section className="nfg-section">
-          <h3 className="nfg-section-h">Beziehungen</h3>
-          {rel.sources.length>0&&<div className="nfg-rel"><div className="nfg-rel-lbl">Bezieht von</div><div className="nfg-rel-row">{rel.sources.map(id=>{const r=byId(id);return r&&<button key={id} className="nfg-rel-chip" onClick={()=>onOpen(r)}><i style={{background:TYPE_DOT(r.type)}}/>{r.name}</button>;})}</div></div>}
-          {rel.delivers.length>0&&<div className="nfg-rel"><div className="nfg-rel-lbl">Liefert an</div><div className="nfg-rel-row">{rel.delivers.map(id=>{const r=byId(id);return r&&<button key={id} className="nfg-rel-chip" onClick={()=>onOpen(r)}><i style={{background:TYPE_DOT(r.type)}}/>{r.name}</button>;})}</div></div>}
+          <h3 className="nfg-section-h">{t('profile.relations','Beziehungen')}</h3>
+          {rel.sources.length>0&&<div className="nfg-rel"><div className="nfg-rel-lbl">{t('profile.sources','Bezieht von')}</div><div className="nfg-rel-row">{rel.sources.map(id=>{const r=byId(id);return r&&<button key={id} className="nfg-rel-chip" onClick={()=>onOpen(r)}><i style={{background:TYPE_DOT(r.type)}}/>{r.name}</button>;})}</div></div>}
+          {rel.delivers.length>0&&<div className="nfg-rel"><div className="nfg-rel-lbl">{t('profile.delivers','Liefert an')}</div><div className="nfg-rel-row">{rel.delivers.map(id=>{const r=byId(id);return r&&<button key={id} className="nfg-rel-chip" onClick={()=>onOpen(r)}><i style={{background:TYPE_DOT(r.type)}}/>{r.name}</button>;})}</div></div>}
         </section>}
         <section className="nfg-section">
-          <h3 className="nfg-section-h">Kommentare & Bewertungen {!cLoading&&`(${comments.length})`}</h3>
+          <h3 className="nfg-section-h">{t('profile.comments_h','Kommentare & Bewertungen')} {!cLoading&&`(${comments.length})`}</h3>
           {user ? <form className="nfg-comment-form" onSubmit={submitComment}>
-            <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Deine Bewertung</div>
+            <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>{t('profile.your_rating','Deine Bewertung')}</div>
             <StarPicker value={rating} onChange={setRating}/>
-            <textarea className="nfg-comment-textarea" value={commentText} onChange={e=>setCommentText(e.target.value)} placeholder="Was hast du erlebt?..." required/>
+            <textarea className="nfg-comment-textarea" value={commentText} onChange={e=>setCommentText(e.target.value)} placeholder={t('profile.comment_ph','Was hast du erlebt?…')} required/>
             <button className="nfg-btn-primary" type="submit" disabled={submitting} style={{padding:'9px 18px',fontSize:13,opacity:submitting?0.7:1}}>
-              {submitting?'…':'Kommentar posten'}
+              {submitting?'…':t('profile.post_comment','Kommentar posten')}
             </button>
           </form> : <div style={{background:'#fff',border:'1px dashed var(--nfg-line)',borderRadius:12,padding:'16px 20px',marginBottom:16}}>
-            <p style={{margin:'0 0 10px',fontSize:13,color:'#666'}}>Anmelden um zu kommentieren und zu bewerten.</p>
-            <button className="nfg-btn-primary" style={{fontSize:13,padding:'9px 16px'}} onClick={()=>onAuth('login')}>Anmelden / Registrieren</button>
+            <p style={{margin:'0 0 10px',fontSize:13,color:'#666'}}>{t('profile.login_to_comment','Anmelden um zu kommentieren und zu bewerten.')}</p>
+            <button className="nfg-btn-primary" style={{fontSize:13,padding:'9px 16px'}} onClick={()=>onAuth('login')}>{t('profile.sign_in','Anmelden / Registrieren')}</button>
           </div>}
-          {cLoading&&<p style={{fontSize:13,color:'#666'}}>Lade Kommentare…</p>}
-          {!cLoading&&comments.length===0&&<p style={{fontSize:13,color:'#666',margin:0}}>Noch keine Kommentare. Sei der Erste!</p>}
+          {cLoading&&<p style={{fontSize:13,color:'#666'}}>{t('profile.loading_comments','Lade Kommentare…')}</p>}
+          {!cLoading&&comments.length===0&&<p style={{fontSize:13,color:'#666',margin:0}}>{t('profile.no_comments','Noch keine Kommentare. Sei der Erste!')}</p>}
           {comments.map(c=><div key={c.id} className="nfg-comment-card">
             <div className="nfg-comment-header">
               <span className="nfg-comment-name">{c.user_name}</span>
@@ -916,12 +1039,12 @@ function SwissMap({items,onPick,focusId}) {
 
 // ── Guide page ─────────────────────────────────────────────────
 function GuidePage({listings,saved,onSave,onOpen,onLike,likeCounts,myLikes}) {
+  const {t,locale,setLocale}=useLang();
   const [view,setView]=useState('list');
   const [query,setQuery]=useState('');
   const [cats,setCats]=useState(['Restaurant']);
   const [tags,setTags]=useState([]);
   const [city,setCity]=useState('');
-  const [locale,setLocale]=useState('DE');
   const [focusId,setFocusId]=useState(null);
   const filtered=useMemo(()=>listings.filter(it=>{
     if(cats.length&&!cats.includes(it.type))return false;
@@ -937,30 +1060,30 @@ function GuidePage({listings,saved,onSave,onOpen,onLike,likeCounts,myLikes}) {
     <header className="nfg-hd">
       <div className="nfg-hd-top">
         <div className="nfg-hd-ttl">Natural Food Guide</div>
-        <button className="nfg-lang" onClick={()=>setLocale(l=>l==='DE'?'EN':'DE')}>{locale}</button>
+        <button className="nfg-lang" onClick={()=>setLocale(locale==='DE'?'EN':'DE')}>{locale}</button>
       </div>
       <div className="nfg-search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <input value={query} onChange={e=>setQuery(e.target.value)} placeholder={locale==='DE'?'Suche nach Name, Stadt, Tag…':'Search name, city, tag…'}/>
+        <input value={query} onChange={e=>setQuery(e.target.value)} placeholder={t('guide.search','Suche nach Name, Stadt, Tag…')}/>
         {query&&<button className="nfg-clr" onClick={()=>setQuery('')}>×</button>}
       </div>
     </header>
     <div className="nfg-toolbar">
       <div className="nfg-cats">{CATEGORIES.map(c=>{const a=cats.includes(c.id);return <button key={c.id} className={'nfg-cat'+(a?' on':'')} onClick={()=>togCat(c.id)} style={a?{background:TYPE_COLORS[c.id],color:'#000',borderColor:'#000'}:{}}><span className="nfg-cat-dot" style={{background:TYPE_COLORS[c.id]}}/>{c.label}</button>;})}</div>
       <div className="nfg-toolbar-row">
-        <select className="nfg-select" value={city} onChange={e=>setCity(e.target.value)}><option value="">Alle Standorte</option>{cities.map(c=><option key={c} value={c}>{c}</option>)}</select>
-        <div className="nfg-viewtoggle"><button className={view==='list'?'on':''} onClick={()=>setView('list')}>Liste</button><button className={view==='map'?'on':''} onClick={()=>setView('map')}>Karte</button></div>
+        <select className="nfg-select" value={city} onChange={e=>setCity(e.target.value)}><option value="">{t('guide.all_locations','Alle Standorte')}</option>{cities.map(c=><option key={c} value={c}>{c}</option>)}</select>
+        <div className="nfg-viewtoggle"><button className={view==='list'?'on':''} onClick={()=>setView('list')}>{t('guide.list_view','Liste')}</button><button className={view==='map'?'on':''} onClick={()=>setView('map')}>{t('guide.map_view','Karte')}</button></div>
       </div>
       <div className="nfg-tags">{TAGS_LIST.map(t=><button key={t} className={'nfg-tag'+(tags.includes(t)?' on':'')} onClick={()=>togTag(t)}>{tags.includes(t)?'✓ ':'+ '}{t}</button>)}</div>
     </div>
     {view==='map'?<div className="nfg-map-section">
       <SwissMap items={filtered} onPick={it=>setFocusId(it.id)} focusId={focusId}/>
-      {focusId?(()=>{const it=filtered.find(x=>x.id===focusId);return it&&<div className="nfg-map-pop" onClick={()=>onOpen(it)}><div><Ph kind={it.image} label={it.type}/></div><div><div className="nfg-card-meta"><span className="nfg-card-type"><i style={{background:TYPE_DOT(it.type)}}/>{it.type}</span><span>{it.city}</span></div><h4>{it.name}</h4><p>{it.short}</p><span className="nfg-link">Profil →</span></div></div>;})():<div className="nfg-map-hint">Tipp: Pin anklicken für Kurzinfo.</div>}
+      {focusId?(()=>{const it=filtered.find(x=>x.id===focusId);return it&&<div className="nfg-map-pop" onClick={()=>onOpen(it)}><div><Ph kind={it.image} label={it.type}/></div><div><div className="nfg-card-meta"><span className="nfg-card-type"><i style={{background:TYPE_DOT(it.type)}}/>{it.type}</span><span>{it.city}</span></div><h4>{it.name}</h4><p>{it.short}</p><span className="nfg-link">{t('guide.profile_link','Profil →')}</span></div></div>;})():<div className="nfg-map-hint">{t('guide.map_hint','Tipp: Pin anklicken für Kurzinfo.')}</div>}
     </div>:<div className="nfg-content">
-      <div className="nfg-result-head"><span><b>{filtered.length}</b> Einträge</span><span>{cats.length===1?CATEGORIES.find(c=>c.id===cats[0])?.label:'gemischt'}</span></div>
+      <div className="nfg-result-head"><span><b>{filtered.length}</b> Einträge</span><span>{cats.length===1?CATEGORIES.find(c=>c.id===cats[0])?.label:t('guide.mixed','gemischt')}</span></div>
       <div className="nfg-list">
         {filtered.map(it=><ListingCard key={it.id} item={it} onOpen={onOpen} saved={saved.includes(it.id)} onSave={onSave} liked={myLikes.has(it.id)} likeCount={likeCounts[it.id]||0} onLike={onLike}/>)}
-        {filtered.length===0&&<div className="nfg-empty">{listings.length===0?'Noch keine Einträge. Gehe zu «Verwalten» um Betriebe hinzuzufügen.':'Keine Treffer. Filter anpassen.'}</div>}
+        {filtered.length===0&&<div className="nfg-empty">{listings.length===0?t('guide.no_entries','Noch keine Einträge. Gehe zu «Verwalten» um Betriebe hinzuzufügen.'):t('guide.no_results','Keine Treffer. Filter anpassen.')}</div>}
       </div>
     </div>}
   </>;
@@ -968,37 +1091,39 @@ function GuidePage({listings,saved,onSave,onOpen,onLike,likeCounts,myLikes}) {
 
 // ── Merkliste page ─────────────────────────────────────────────
 function MerklistePage({listings,saved,onSave,onOpen,user,onAuth,onLike,likeCounts,myLikes}) {
+  const {t}=useLang();
   const items=listings.filter(x=>saved.includes(x.id));
   if(!user)return <div className="nfg-page">
-    <h2 className="nfg-page-h">Meine Merkliste</h2>
-    <p className="nfg-login-hint">Speichere Betriebe in deine persönliche Merkliste. Anmeldung erforderlich.</p>
+    <h2 className="nfg-page-h">{t('merkliste.title','Meine Merkliste')}</h2>
+    <p className="nfg-login-hint">{t('merkliste.login_hint','Speichere Betriebe in deine persönliche Merkliste. Anmeldung erforderlich.')}</p>
     <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-      <button className="nfg-btn-primary" onClick={()=>onAuth('login')}>Anmelden</button>
-      <button className="nfg-btn-ghost" onClick={()=>onAuth('register')}>Konto erstellen</button>
+      <button className="nfg-btn-primary" onClick={()=>onAuth('login')}>{t('merkliste.sign_in','Anmelden')}</button>
+      <button className="nfg-btn-ghost" onClick={()=>onAuth('register')}>{t('merkliste.register','Konto erstellen')}</button>
     </div>
   </div>;
   return <div className="nfg-page">
-    <h2 className="nfg-page-h">Meine Merkliste</h2>
+    <h2 className="nfg-page-h">{t('merkliste.title','Meine Merkliste')}</h2>
     <p className="nfg-page-sub">{items.length} gespeicherte {items.length===1?'Eintrag':'Einträge'}</p>
-    <div className="nfg-list">{items.length===0?<div className="nfg-empty">Noch nichts gespeichert. Im Guide Einträge mit ♡ markieren.</div>:items.map(it=><ListingCard key={it.id} item={it} onOpen={onOpen} saved={true} onSave={onSave} liked={myLikes.has(it.id)} likeCount={likeCounts[it.id]||0} onLike={onLike}/>)}</div>
+    <div className="nfg-list">{items.length===0?<div className="nfg-empty">{t('merkliste.empty','Noch nichts gespeichert. Im Guide Einträge mit ♡ markieren.')}</div>:items.map(it=><ListingCard key={it.id} item={it} onOpen={onOpen} saved={true} onSave={onSave} liked={myLikes.has(it.id)} likeCount={likeCounts[it.id]||0} onLike={onLike}/>)}</div>
   </div>;
 }
 
 // ── Mehr page ──────────────────────────────────────────────────
 function MehrPage({events,magazine,onTrack}) {
+  const {t}=useLang();
   const upcoming=[...events].sort((a,b)=>a.date_start<b.date_start?-1:1);
   const mags=[...magazine].sort((a,b)=>(a.sort_order??0)-(b.sort_order??0));
   return <div className="nfg-page">
-    <h2 className="nfg-page-h">Mehr</h2>
+    <h2 className="nfg-page-h">{t('mehr.title','Mehr')}</h2>
     <div className="nfg-mehr-grid">
-      <section className="nfg-more-card full"><h3 className="nfg-more-h">Was ist der Natural Food Guide?</h3><p>Ein kuratierter Guide für Restaurants, Verarbeiter:innen, Höfe, Läden sowie Pop-Ups & Events in der Schweiz, die mit Boden, Saison und Herkunft konsequent umgehen.</p><a href="#" className="nfg-link">Über uns →</a></section>
+      <section className="nfg-more-card full"><h3 className="nfg-more-h">{t('mehr.about_title','Was ist der Natural Food Guide?')}</h3><p>{t('mehr.about_text','Ein kuratierter Guide für Restaurants, Verarbeiter:innen, Höfe, Läden sowie Pop-Ups & Events in der Schweiz, die mit Boden, Saison und Herkunft konsequent umgehen.')}</p><a href="#" className="nfg-link">{t('mehr.about_link','Über uns →')}</a></section>
       <section className="nfg-more-card full" id="kriterien">
-        <h3 className="nfg-more-h">Bewertungskriterien</h3>
-        <p>Restaurants im Natural Food Guide werden nach einem transparenten Kriterienkatalog bewertet. Die Bewertung erfolgt in den Kategorien «Küche» und «Restaurant &amp; Betrieb».</p>
+        <h3 className="nfg-more-h">{t('mehr.criteria_title','Bewertungskriterien')}</h3>
+        <p>{t('mehr.criteria_intro','Restaurants im Natural Food Guide werden nach einem transparenten Kriterienkatalog bewertet. Die Bewertung erfolgt in den Kategorien «Küche» und «Restaurant & Betrieb».')}</p>
         <div className="nfg-pts-legend">
-          <div className="nfg-pts-legend-row"><b>3 Punkte:</b><span>wird grösstenteils eingehalten</span></div>
-          <div className="nfg-pts-legend-row"><b>2 Punkte:</b><span>wird mehrheitlich eingehalten, bis auf wenige Ausnahmen</span></div>
-          <div className="nfg-pts-legend-row"><b>1 Punkt:</b><span>wird nur wenig darauf geachtet</span></div>
+          <div className="nfg-pts-legend-row"><b>3 Punkte:</b><span>{t('mehr.pts_3','wird grösstenteils eingehalten')}</span></div>
+          <div className="nfg-pts-legend-row"><b>2 Punkte:</b><span>{t('mehr.pts_2','wird mehrheitlich eingehalten, bis auf wenige Ausnahmen')}</span></div>
+          <div className="nfg-pts-legend-row"><b>1 Punkt:</b><span>{t('mehr.pts_1','wird nur wenig darauf geachtet')}</span></div>
         </div>
         <div className="nfg-kriterien-grid">
           <div>
@@ -1012,7 +1137,7 @@ function MehrPage({events,magazine,onTrack}) {
             <ul className="nfg-kriterien-list">
               {[['Kommunikation gegenüber den Gästen; Nachhaltigkeit wird ehrlich kommuniziert',1],['Bezugsquellen und Produzent:innen werden offen genannt',1],['Kleinere Portionengrössen, um Foodwaste zu vermeiden',2],['Kooperationen mit Vereinen (Tischlein deck dich, Too good to go, etc.)',3],['Faires Arbeitsklima und Entlöhnungssystem',2],['Nachhaltige Betriebsführung; Förderung der Mitarbeitenden, Weiterbildungen',2]].map(([n,p])=><li key={n} className="nfg-kriterien-item"><span>{n}</span><span className="nfg-kriterien-pts">max. {p}</span></li>)}
             </ul>
-            <div className="nfg-kriterien-cat-h" style={{marginTop:22}}>Bonuspunkte</div>
+            <div className="nfg-kriterien-cat-h" style={{marginTop:22}}>{t('mehr.bonus_title','Bonuspunkte')}</div>
             <ul className="nfg-bonus-list">
               <li>Eigener Garten mit Gemüse, Obst und/oder Kräuter</li>
               <li>Workshops zum Thema Nachhaltigkeit</li>
@@ -1020,11 +1145,11 @@ function MehrPage({events,magazine,onTrack}) {
             </ul>
           </div>
         </div>
-        <div className="nfg-kriterien-note"><b>Transparenz</b>Alle Bewertungen basieren auf direkten Gesprächen mit den Restaurants und werden regelmässig aktualisiert. Die Kriterien sind öffentlich einsehbar und nachvollziehbar.</div>
+        <div className="nfg-kriterien-note"><b>{t('mehr.transparency','Transparenz')}</b>{t('mehr.transparency_text','Alle Bewertungen basieren auf direkten Gesprächen mit den Restaurants und werden regelmässig aktualisiert. Die Kriterien sind öffentlich einsehbar und nachvollziehbar.')}</div>
       </section>
       <section className="nfg-more-card">
-        <h3 className="nfg-more-h">Magazin</h3>
-        {mags.length===0?<p style={{color:'#666',fontSize:14}}>Noch keine Beiträge.</p>:
+        <h3 className="nfg-more-h">{t('mehr.magazine_title','Magazin')}</h3>
+        {mags.length===0?<p style={{color:'#666',fontSize:14}}>{t('mehr.no_magazine','Noch keine Beiträge.')}</p>:
           <div className="nfg-mag">
             {mags.map(m=>{
               const href=m.doc_url||m.link;
@@ -1038,7 +1163,7 @@ function MehrPage({events,magazine,onTrack}) {
                   {href&&<div className="nfg-mag-footer">
                     <a className="nfg-mag-cta" href={href} target="_blank" rel="noopener noreferrer"
                        onClick={e=>{e.preventDefault();onTrack('magazine_click',m.id);window.open(href,'_blank','noopener,noreferrer');}}>
-                      {m.doc_url?'↓ Dokument':'→ Lesen'}
+                      {m.doc_url?t('mehr.document','↓ Dokument'):t('mehr.read','→ Lesen')}
                     </a>
                   </div>}
                 </div>
@@ -1047,8 +1172,8 @@ function MehrPage({events,magazine,onTrack}) {
           </div>}
       </section>
       <section className="nfg-more-card">
-        <h3 className="nfg-more-h">Eventkalender</h3>
-        {upcoming.length===0?<p style={{color:'#666',fontSize:14}}>Keine Events erfasst.</p>:
+        <h3 className="nfg-more-h">{t('mehr.events_title','Eventkalender')}</h3>
+        {upcoming.length===0?<p style={{color:'#666',fontSize:14}}>{t('mehr.no_events','Keine Events erfasst.')}</p>:
           <ul className="nfg-events">
             {upcoming.map(ev=><li key={ev.id}>
               {ev.image_url
@@ -1710,6 +1835,74 @@ function MagazineTab({magazine,setMagazine}) {
   </>;
 }
 
+// ── Verwalten — Sprache tab ────────────────────────────────────
+function SprachTab() {
+  const [rows,setRows]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [saving,setSaving]=useState({});
+
+  useEffect(()=>{
+    db.from('translations').select('*').order('page').order('key')
+      .then(({data})=>{ setRows(data||[]); setLoading(false); });
+  },[]);
+
+  const save=async(key,en)=>{
+    setSaving(s=>({...s,[key]:true}));
+    await db.from('translations').update({en:en||null,updated_at:new Date().toISOString()}).eq('key',key);
+    setSaving(s=>({...s,[key]:false}));
+  };
+
+  const byPage={};
+  rows.forEach(r=>{ if(!byPage[r.page]) byPage[r.page]=[]; byPage[r.page].push(r); });
+
+  const translated=rows.filter(r=>r.en).length;
+
+  if(loading) return <p style={{color:'#666',fontSize:14,marginTop:20}}>Laden…</p>;
+
+  return <div>
+    <p className="nfg-page-sub">{translated}/{rows.length} Texte übersetzt</p>
+    {Object.entries(byPage).map(([page,pageRows])=><div key={page}>
+      <div className="nfg-sprach-section">{page.charAt(0).toUpperCase()+page.slice(1)}</div>
+      <table className="nfg-sprach-table">
+        <thead>
+          <tr>
+            <th style={{width:'22%'}}>Key</th>
+            <th style={{width:'35%'}}>Deutsch</th>
+            <th>Englisch</th>
+            <th style={{width:28}}/>
+          </tr>
+        </thead>
+        <tbody>
+          {pageRows.map(r=>{
+            const hasTrans=!!r.en;
+            return <tr key={r.key}>
+              <td className="nfg-sprach-key">{r.key}</td>
+              <td className="nfg-sprach-de">{r.de}</td>
+              <td>
+                <input
+                  className="nfg-input"
+                  style={{width:'100%',fontSize:13,padding:'5px 8px',borderColor:hasTrans?'var(--nfg-line)':'#ffcc00'}}
+                  defaultValue={r.en||''}
+                  onBlur={e=>{
+                    const val=e.target.value.trim();
+                    if(val!==(r.en||'')){
+                      save(r.key,val);
+                      setRows(prev=>prev.map(x=>x.key===r.key?{...x,en:val||null}:x));
+                    }
+                  }}
+                />
+              </td>
+              <td style={{textAlign:'center',fontSize:12,color:'#aaa'}}>
+                {saving[r.key]?'💾':hasTrans?<span style={{color:'#22c55e'}}>✓</span>:<span style={{color:'#f59e0b'}}>○</span>}
+              </td>
+            </tr>;
+          })}
+        </tbody>
+      </table>
+    </div>)}
+  </div>;
+}
+
 // ── Verwalten page ─────────────────────────────────────────────
 // ── Analytics ─────────────────────────────────────────────────
 function MiniChart({data}) {
@@ -1855,7 +2048,7 @@ function VerwaltenPage({listings,setListings,currentUserId,events,setEvents,maga
   return <div className="nfg-page">
     <h2 className="nfg-page-h">Verwalten</h2>
     <div style={{display:'flex',gap:4,marginBottom:24,background:'#f0f0f0',borderRadius:12,padding:4,width:'fit-content',flexWrap:'wrap'}}>
-      {[['betriebe','Betriebe'],['events','Events'],['magazin','Magazin'],['user','User'],['analytics','Analytics']].map(([id,lbl])=>
+      {[['betriebe','Betriebe'],['events','Events'],['magazin','Magazin'],['user','User'],['analytics','Analytics'],['sprache','Sprache']].map(([id,lbl])=>
         <button key={id} onClick={()=>setVtab(id)} style={{border:'none',borderRadius:9,padding:'8px 20px',fontFamily:'inherit',fontSize:14,fontWeight:700,cursor:'pointer',background:vtab===id?'#000':'transparent',color:vtab===id?'#fff':'#666',transition:'all 0.15s'}}>
           {lbl}
         </button>
@@ -1866,6 +2059,7 @@ function VerwaltenPage({listings,setListings,currentUserId,events,setEvents,maga
     {vtab==='magazin'  &&<MagazineTab magazine={magazine} setMagazine={setMagazine}/>}
     {vtab==='user'     &&<UserTab currentUserId={currentUserId}/>}
     {vtab==='analytics'&&<AnalyticsTab listings={listings} events={events} magazine={magazine}/>}
+    {vtab==='sprache'  &&<SprachTab/>}
   </div>;
 }
 
@@ -1877,6 +2071,8 @@ function App() {
   const [listings,setListings]=useState([]);
   const [events,setEvents]=useState([]);
   const [magazine,setMagazine]=useState([]);
+  const [locale,setLocale]=useState('DE');
+  const [translations,setTranslations]=useState({});
   const [saved,setSaved]=useState([]);
   const savedRef=useRef([]);
   useEffect(()=>{ savedRef.current=saved; },[saved]);
@@ -1893,6 +2089,13 @@ function App() {
     }
     return fp;
   },[]);
+  // t() — Übersetzungsfunktion: gibt EN zurück wenn locale=EN und EN vorhanden, sonst DE (Fallback)
+  const t=useCallback((key,fallbackDE='')=>{
+    const row=translations[key];
+    if(!row) return fallbackDE||key;
+    return locale==='EN'&&row.en?row.en:row.de||fallbackDE||key;
+  },[translations,locale]);
+
   // userRef — für stabilen Zugriff in track() ohne stale closure
   const userRef=useRef(null);
   useEffect(()=>{ userRef.current=user; },[user]);
@@ -1940,6 +2143,9 @@ function App() {
     db.from('magazine').select('*').order('sort_order').then(({data})=>{
       if(data) setMagazine(data);
     });
+    db.from('translations').select('*').then(({data})=>{
+      if(data){ const m={}; data.forEach(r=>{m[r.key]={de:r.de,en:r.en};}); setTranslations(m); }
+    });
     // Alle Likes laden (nur unternehmen_id für Zählung)
     db.from('likes').select('unternehmen_id').then(({data})=>{
       if(!data) return;
@@ -1984,14 +2190,14 @@ function App() {
   },[tab]);
 
   const onSave=useCallback(async id=>{
-    if(!user){setAuthModal({mode:'login',hint:'Bitte melde dich an, um Betriebe zu merken.'});return;}
+    if(!user){setAuthModal({mode:'login',hint:t('auth.merken_hint','Bitte melde dich an, um Betriebe zu merken.')});return;}
     const willSave=!savedRef.current.includes(id);
     setSaved(prev=>willSave?[...prev,id]:prev.filter(x=>x!==id));
     const {error}=willSave
       ?await db.from('saved_items').insert({user_id:user.id,unternehmen_id:id})
       :await db.from('saved_items').delete().eq('user_id',user.id).eq('unternehmen_id',id);
     if(error) setSaved(prev=>willSave?prev.filter(x=>x!==id):[...prev,id]);
-  },[user]);
+  },[user,t]);
 
   const onLike=useCallback(async id=>{
     const alreadyLiked=myLikesRef.current.has(id);
@@ -2028,19 +2234,21 @@ function App() {
 
   if(!ready) return <Loader/>;
 
-  return <div className="nfg-shell">
-    <Sidebar tab={tab} setTab={setTab} savedCount={saved.length} user={user} isAdmin={isAdmin} onAuth={onAuth} onLogout={onLogout}/>
-    <main className="nfg-main">
-      {tab==='guide'     &&<GuidePage {...shared}/>}
-      {tab==='merkliste' &&<MerklistePage {...shared} user={user} onAuth={onAuth}/>}
-      {tab==='mehr'      &&<MehrPage events={events} magazine={magazine} onTrack={track}/>}
-      {tab==='verwalten' &&isAdmin&&<VerwaltenPage listings={listings} setListings={setListings} currentUserId={user?.id} events={events} setEvents={setEvents} magazine={magazine} setMagazine={setMagazine}/>}
-      {tab==='verwalten' &&!isAdmin&&<div className="nfg-page"><h2 className="nfg-page-h">Verwalten</h2><p className="nfg-login-hint">{user?'Du hast keine Berechtigung für die Verwaltung.':'Bitte einloggen.'}</p>{!user&&<button className="nfg-btn-primary" onClick={()=>onAuth('login')}>Anmelden</button>}</div>}
-    </main>
-    <MobileNav tab={tab} setTab={setTab} savedCount={saved.length} user={user} isAdmin={isAdmin} onAuth={onAuth}/>
-    {open&&listings.find(x=>x.id===open.id)&&<Profile item={open} listings={listings} onClose={()=>setOpen(null)} saved={saved.includes(open.id)} onSave={onSave} onOpen={onOpen} user={user} onAuth={onAuth} liked={myLikes.has(open.id)} likeCount={likeCounts[open.id]||0} onLike={onLike} onTrack={track}/>}
-    {authModal&&<AuthModal mode={typeof authModal==='object'?authModal.mode:authModal} hint={typeof authModal==='object'?authModal.hint:null} onClose={()=>setAuthModal(null)} onAuth={u=>{setUser(u);setAuthModal(null);loadRole(u?.id??null);}}/>}
-  </div>;
+  return <LangCtx.Provider value={{locale,setLocale,t}}>
+    <div className="nfg-shell">
+      <Sidebar tab={tab} setTab={setTab} savedCount={saved.length} user={user} isAdmin={isAdmin} onAuth={onAuth} onLogout={onLogout}/>
+      <main className="nfg-main">
+        {tab==='guide'     &&<GuidePage {...shared}/>}
+        {tab==='merkliste' &&<MerklistePage {...shared} user={user} onAuth={onAuth}/>}
+        {tab==='mehr'      &&<MehrPage events={events} magazine={magazine} onTrack={track}/>}
+        {tab==='verwalten' &&isAdmin&&<VerwaltenPage listings={listings} setListings={setListings} currentUserId={user?.id} events={events} setEvents={setEvents} magazine={magazine} setMagazine={setMagazine}/>}
+        {tab==='verwalten' &&!isAdmin&&<div className="nfg-page"><h2 className="nfg-page-h">Verwalten</h2><p className="nfg-login-hint">{user?'Du hast keine Berechtigung für die Verwaltung.':'Bitte einloggen.'}</p>{!user&&<button className="nfg-btn-primary" onClick={()=>onAuth('login')}>Anmelden</button>}</div>}
+      </main>
+      <MobileNav tab={tab} setTab={setTab} savedCount={saved.length} user={user} isAdmin={isAdmin} onAuth={onAuth}/>
+      {open&&listings.find(x=>x.id===open.id)&&<Profile item={open} listings={listings} onClose={()=>setOpen(null)} saved={saved.includes(open.id)} onSave={onSave} onOpen={onOpen} user={user} onAuth={onAuth} liked={myLikes.has(open.id)} likeCount={likeCounts[open.id]||0} onLike={onLike} onTrack={track}/>}
+      {authModal&&<AuthModal mode={typeof authModal==='object'?authModal.mode:authModal} hint={typeof authModal==='object'?authModal.hint:null} onClose={()=>setAuthModal(null)} onAuth={u=>{setUser(u);setAuthModal(null);loadRole(u?.id??null);}}/>}
+    </div>
+  </LangCtx.Provider>;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
