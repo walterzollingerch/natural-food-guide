@@ -201,6 +201,12 @@ body { background: var(--nfg-bg); font-family: var(--nfg-sans); color: var(--nfg
 .nfg-events span { font-size: 12px; color: #666; line-height: 1.4; display: block; margin-top: 2px; }
 .nfg-event-img { width: 90px; height: 64px; object-fit: cover; border-radius: 8px; flex-shrink: 0; display: block; }
 .nfg-event-ph { width: 90px; height: 64px; border-radius: 8px; flex-shrink: 0; position: relative; overflow: hidden; }
+.nfg-like-btn { display: inline-flex; align-items: center; gap: 7px; border: 2px solid var(--nfg-line); border-radius: 999px; padding: 7px 16px; font-size: 13px; font-weight: 700; cursor: pointer; background: #fff; transition: all 0.15s; color: #555; font-family: var(--nfg-sans); }
+.nfg-like-btn.on { background: #fff0f3; border-color: #d0003e; color: #d0003e; }
+.nfg-like-btn:not(.on):hover { border-color: #d0003e; color: #d0003e; }
+.nfg-card-like { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #aaa; border: none; background: none; padding: 0; cursor: pointer; font-family: var(--nfg-sans); transition: color 0.12s; margin-top: 5px; }
+.nfg-card-like.on { color: #d0003e; }
+.nfg-card-like:not(.on):hover { color: #d0003e; }
 .nfg-admin-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
 .nfg-admin-list { display: flex; flex-direction: column; gap: 8px; }
 .nfg-admin-item { background: #fff; border: 1px solid var(--nfg-line); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; transition: box-shadow 0.15s; }
@@ -333,6 +339,24 @@ CREATE TABLE IF NOT EXISTS saved_items (
   unternehmen_id TEXT REFERENCES unternehmen ON DELETE CASCADE,
   PRIMARY KEY (user_id, unternehmen_id)
 );
+
+-- Tabelle: Likes (ohne Login möglich — 1× pro Browser/Gerät, für eingeloggte User 1× pro Account)
+CREATE TABLE IF NOT EXISTS likes (
+  fingerprint      TEXT NOT NULL,          -- zufällige UUID aus localStorage (anonym) oder user_id (eingeloggt)
+  unternehmen_id   TEXT NOT NULL REFERENCES unternehmen ON DELETE CASCADE,
+  user_id          UUID REFERENCES auth.users ON DELETE SET NULL,  -- null wenn anonym
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (fingerprint, unternehmen_id)
+);
+-- Verhindert, dass ein eingeloggter User von mehreren Browsern aus doppelt liken kann
+CREATE UNIQUE INDEX IF NOT EXISTS likes_user_uniq
+  ON likes (user_id, unternehmen_id)
+  WHERE user_id IS NOT NULL;
+
+ALTER TABLE likes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Likes öffentlich lesbar" ON likes FOR SELECT USING (true);
+CREATE POLICY "Jeder kann liken"        ON likes FOR INSERT WITH CHECK (true);
+CREATE POLICY "Like entfernen"          ON likes FOR DELETE USING (true);
 
 -- Tabelle: Kommentare & Bewertungen
 CREATE TABLE IF NOT EXISTS comments (
@@ -670,7 +694,7 @@ function MobileNav({tab,setTab,savedCount,user,isAdmin,onAuth}) {
 }
 
 // ── Listing card ───────────────────────────────────────────────
-function ListingCard({item,onOpen,saved,onSave}) {
+function ListingCard({item,onOpen,saved,onSave,liked,likeCount,onLike}) {
   return <article className={'nfg-card'+(item.featured?' featured':'')} onClick={()=>onOpen(item)}>
     <div className="nfg-card-img">
       {item.photo_main
@@ -690,6 +714,10 @@ function ListingCard({item,onOpen,saved,onSave}) {
       <h3 className="nfg-card-name">{item.name}</h3>
       <p className="nfg-card-short">{item.short}</p>
       <div className="nfg-card-tags">{(item.tags||[]).slice(0,3).map(t=><span key={t} className="nfg-card-tag">{t}</span>)}</div>
+      {(likeCount>0||liked)&&<button className={'nfg-card-like'+(liked?' on':'')} onClick={e=>{e.stopPropagation();onLike(item.id);}}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill={liked?'currentColor':'none'} stroke="currentColor" strokeWidth="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        {likeCount>0?likeCount:''}
+      </button>}
     </div>
   </article>;
 }
@@ -704,10 +732,9 @@ const NFG_RELATIONS = {
   'schauenstein':{'sources':['sool-hof'],'delivers':[]}
 };
 
-function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth}) {
+function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth,liked,likeCount,onLike}) {
   const rel = NFG_RELATIONS[item.id]||{sources:[],delivers:[]};
   const byId = id => listings.find(x=>x.id===id);
-  const [liked,setLiked]=useState(false);
   const [comments,setComments]=useState([]);
   const [cLoading,setCLoading]=useState(true);
   const [commentText,setCommentText]=useState('');
@@ -770,6 +797,10 @@ function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth}) {
           {item.book&&!item.booking_url&&<button className="nfg-btn-primary">Tisch reservieren</button>}
           {item.website_url&&<a className="nfg-btn-link outline" href={item.website_url} target="_blank" rel="noopener noreferrer">Website ↗</a>}
           <button className={'nfg-btn-ghost'+(saved?' on':'')} onClick={()=>onSave(item.id)}>{saved?'✓ Gespeichert':'Merken'}</button>
+          <button className={'nfg-like-btn'+(liked?' on':'')} onClick={()=>onLike(item.id)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill={liked?'currentColor':'none'} stroke="currentColor" strokeWidth="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            {liked?'Gefällt mir':'Gefällt mir'}{likeCount>0&&<span style={{fontWeight:400,marginLeft:2}}>({likeCount})</span>}
+          </button>
         </div>
         {(item.address||item.phone||item.email)&&<section className="nfg-section">
           <h3 className="nfg-section-h">Kontakt</h3>
@@ -847,7 +878,7 @@ function SwissMap({items,onPick,focusId}) {
 }
 
 // ── Guide page ─────────────────────────────────────────────────
-function GuidePage({listings,saved,onSave,onOpen}) {
+function GuidePage({listings,saved,onSave,onOpen,onLike,likeCounts,myLikes}) {
   const [view,setView]=useState('list');
   const [query,setQuery]=useState('');
   const [cats,setCats]=useState(['Restaurant']);
@@ -891,7 +922,7 @@ function GuidePage({listings,saved,onSave,onOpen}) {
     </div>:<div className="nfg-content">
       <div className="nfg-result-head"><span><b>{filtered.length}</b> Einträge</span><span>{cats.length===1?CATEGORIES.find(c=>c.id===cats[0])?.label:'gemischt'}</span></div>
       <div className="nfg-list">
-        {filtered.map(it=><ListingCard key={it.id} item={it} onOpen={onOpen} saved={saved.includes(it.id)} onSave={onSave}/>)}
+        {filtered.map(it=><ListingCard key={it.id} item={it} onOpen={onOpen} saved={saved.includes(it.id)} onSave={onSave} liked={myLikes.has(it.id)} likeCount={likeCounts[it.id]||0} onLike={onLike}/>)}
         {filtered.length===0&&<div className="nfg-empty">{listings.length===0?'Noch keine Einträge. Gehe zu «Verwalten» um Betriebe hinzuzufügen.':'Keine Treffer. Filter anpassen.'}</div>}
       </div>
     </div>}
@@ -899,7 +930,7 @@ function GuidePage({listings,saved,onSave,onOpen}) {
 }
 
 // ── Merkliste page ─────────────────────────────────────────────
-function MerklistePage({listings,saved,onSave,onOpen,user,onAuth}) {
+function MerklistePage({listings,saved,onSave,onOpen,user,onAuth,onLike,likeCounts,myLikes}) {
   const items=listings.filter(x=>saved.includes(x.id));
   if(!user)return <div className="nfg-page">
     <h2 className="nfg-page-h">Meine Merkliste</h2>
@@ -912,7 +943,7 @@ function MerklistePage({listings,saved,onSave,onOpen,user,onAuth}) {
   return <div className="nfg-page">
     <h2 className="nfg-page-h">Meine Merkliste</h2>
     <p className="nfg-page-sub">{items.length} gespeicherte {items.length===1?'Eintrag':'Einträge'}</p>
-    <div className="nfg-list">{items.length===0?<div className="nfg-empty">Noch nichts gespeichert. Im Guide Einträge mit ♡ markieren.</div>:items.map(it=><ListingCard key={it.id} item={it} onOpen={onOpen} saved={true} onSave={onSave}/>)}</div>
+    <div className="nfg-list">{items.length===0?<div className="nfg-empty">Noch nichts gespeichert. Im Guide Einträge mit ♡ markieren.</div>:items.map(it=><ListingCard key={it.id} item={it} onOpen={onOpen} saved={true} onSave={onSave} liked={myLikes.has(it.id)} likeCount={likeCounts[it.id]||0} onLike={onLike}/>)}</div>
   </div>;
 }
 
@@ -1672,6 +1703,19 @@ function App() {
   const [saved,setSaved]=useState([]);
   const savedRef=useRef([]);
   useEffect(()=>{ savedRef.current=saved; },[saved]);
+  const [likeCounts,setLikeCounts]=useState({});
+  const [myLikes,setMyLikes]=useState(new Set());
+  const myLikesRef=useRef(new Set());
+  useEffect(()=>{ myLikesRef.current=myLikes; },[myLikes]);
+  // Einmaliger fingerprint pro Browser — localStorage UUID (für anon Nutzer)
+  const localFp=useMemo(()=>{
+    let fp=localStorage.getItem('nfg_fp');
+    if(!fp){
+      fp='xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16);});
+      localStorage.setItem('nfg_fp',fp);
+    }
+    return fp;
+  },[]);
   const [tab,setTab]=useState('guide');
   const [open,setOpen]=useState(null);
   const [authModal,setAuthModal]=useState(null);
@@ -1707,6 +1751,13 @@ function App() {
     db.from('magazine').select('*').order('sort_order').then(({data})=>{
       if(data) setMagazine(data);
     });
+    // Alle Likes laden (nur unternehmen_id für Zählung)
+    db.from('likes').select('unternehmen_id').then(({data})=>{
+      if(!data) return;
+      const counts={};
+      data.forEach(l=>{ counts[l.unternehmen_id]=(counts[l.unternehmen_id]||0)+1; });
+      setLikeCounts(counts);
+    });
     return ()=>subscription.unsubscribe();
   },[]);
 
@@ -1716,6 +1767,22 @@ function App() {
       if(data) setSaved(data.map(x=>x.unternehmen_id));
     });
   },[user?.id]);
+
+  // Meine Likes laden — bei Änderung von User oder localFp
+  useEffect(()=>{
+    const promises=[
+      db.from('likes').select('unternehmen_id').eq('fingerprint',localFp)
+    ];
+    // Eingeloggte User: auch über user_id prüfen (Cross-Browser)
+    if(user?.id) promises.push(
+      db.from('likes').select('unternehmen_id').eq('user_id',user.id)
+    );
+    Promise.all(promises).then(results=>{
+      const liked=new Set();
+      results.forEach(({data})=>data?.forEach(l=>liked.add(l.unternehmen_id)));
+      setMyLikes(liked);
+    });
+  },[user?.id,localFp]);
 
   const onAuth=useCallback(mode=>setAuthModal(mode),[]);
 
@@ -1735,7 +1802,35 @@ function App() {
     if(error) setSaved(prev=>willSave?prev.filter(x=>x!==id):[...prev,id]);
   },[user]);
 
-  const shared={listings,saved,onSave,onOpen:setOpen};
+  const onLike=useCallback(async id=>{
+    const alreadyLiked=myLikesRef.current.has(id);
+    // Optimistisches Update
+    setMyLikes(prev=>{const n=new Set(prev);alreadyLiked?n.delete(id):n.add(id);return n;});
+    setLikeCounts(prev=>({...prev,[id]:(prev[id]||0)+(alreadyLiked?-1:1)}));
+    if(alreadyLiked){
+      // Unlike: eingeloggte User per user_id löschen (Cross-Browser), anonym per fingerprint
+      const q=user?.id
+        ?db.from('likes').delete().eq('user_id',user.id).eq('unternehmen_id',id)
+        :db.from('likes').delete().eq('fingerprint',localFp).eq('unternehmen_id',id);
+      const{error}=await q;
+      if(error){
+        setMyLikes(prev=>{const n=new Set(prev);n.add(id);return n;});
+        setLikeCounts(prev=>({...prev,[id]:(prev[id]||0)+1}));
+      }
+    }else{
+      const{error}=await db.from('likes').insert({fingerprint:localFp,unternehmen_id:id,user_id:user?.id||null});
+      if(error){
+        // Bei Duplicate-Fehler (bereits geliked von anderem Browser) trotzdem als geliked markieren
+        if(!error.code||error.code!=='23505'){
+          setMyLikes(prev=>{const n=new Set(prev);n.delete(id);return n;});
+          setLikeCounts(prev=>({...prev,[id]:Math.max(0,(prev[id]||0)-1)}));
+        }
+      }
+    }
+  },[user,localFp]);
+
+  const likeProps={onLike,likeCounts,myLikes};
+  const shared={listings,saved,onSave,onOpen:setOpen,...likeProps};
   const isAdmin=userRole==='admin';
 
   if(!ready) return <Loader/>;
@@ -1750,7 +1845,7 @@ function App() {
       {tab==='verwalten' &&!isAdmin&&<div className="nfg-page"><h2 className="nfg-page-h">Verwalten</h2><p className="nfg-login-hint">{user?'Du hast keine Berechtigung für die Verwaltung.':'Bitte einloggen.'}</p>{!user&&<button className="nfg-btn-primary" onClick={()=>onAuth('login')}>Anmelden</button>}</div>}
     </main>
     <MobileNav tab={tab} setTab={setTab} savedCount={saved.length} user={user} isAdmin={isAdmin} onAuth={onAuth}/>
-    {open&&listings.find(x=>x.id===open.id)&&<Profile item={open} listings={listings} onClose={()=>setOpen(null)} saved={saved.includes(open.id)} onSave={onSave} onOpen={setOpen} user={user} onAuth={onAuth}/>}
+    {open&&listings.find(x=>x.id===open.id)&&<Profile item={open} listings={listings} onClose={()=>setOpen(null)} saved={saved.includes(open.id)} onSave={onSave} onOpen={setOpen} user={user} onAuth={onAuth} liked={myLikes.has(open.id)} likeCount={likeCounts[open.id]||0} onLike={onLike}/>}
     {authModal&&<AuthModal mode={typeof authModal==='object'?authModal.mode:authModal} hint={typeof authModal==='object'?authModal.hint:null} onClose={()=>setAuthModal(null)} onAuth={u=>{setUser(u);setAuthModal(null);loadRole(u?.id??null);}}/>}
   </div>;
 }
