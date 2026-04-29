@@ -615,6 +615,59 @@ INSERT INTO translations (key,page,de,en) VALUES
 ('auth.confirm_email','auth','Bestätigungs-E-Mail gesendet. Bitte prüfe dein Postfach.','Confirmation email sent. Please check your inbox.')
 ON CONFLICT (key) DO UPDATE SET de=EXCLUDED.de, en=COALESCE(translations.en,EXCLUDED.en);
 
+-- ================================================================
+-- Tabelle: Typen (ersetzt hardcodierte Typ-Konstanten)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS types (
+  id         TEXT PRIMARY KEY,
+  name_de    TEXT NOT NULL,
+  name_en    TEXT,
+  color      TEXT DEFAULT '#999999',
+  sort_order INT  DEFAULT 0
+);
+ALTER TABLE types ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Typen lesbar"          ON types FOR SELECT USING (true);
+CREATE POLICY "Admins Typen verwalten" ON types FOR ALL USING (
+  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+);
+INSERT INTO types (id, name_de, name_en, color, sort_order) VALUES
+('Restaurant',    'Restaurant',    'Restaurant', '#d2dc46', 0),
+('Verarbeiter:in','Verarbeiter:in','Producer',   '#059669', 1),
+('Landwirt:in',   'Landwirt:in',   'Farm',       '#10b981', 2),
+('Laden',         'Laden',         'Shop',       '#84cc16', 3),
+('Event',         'Event',         'Event',      '#8b5cf6', 4)
+ON CONFLICT (id) DO NOTHING;
+
+-- ================================================================
+-- Tabelle: Tags (ersetzt hardcodierte TAGS_LIST)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS tags (
+  id         TEXT PRIMARY KEY,
+  name_de    TEXT NOT NULL,
+  name_en    TEXT,
+  sort_order INT DEFAULT 0
+);
+ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Tags lesbar"          ON tags FOR SELECT USING (true);
+CREATE POLICY "Admins Tags verwalten" ON tags FOR ALL USING (
+  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+);
+INSERT INTO tags (id, name_de, name_en, sort_order) VALUES
+('Regenerativ',    'Regenerativ',    'Regenerative',  0),
+('Bio',            'Bio',            'Organic',       1),
+('Pflanzenbasiert','Pflanzenbasiert','Plant-based',   2),
+('Saisonal',       'Saisonal',       'Seasonal',      3),
+('Regional',       'Regional',       'Regional',      4),
+('Demeter',        'Demeter',        'Demeter',       5),
+('Tierwohl',       'Tierwohl',       'Animal Welfare',6),
+('Handwerk',       'Handwerk',       'Artisan',       7),
+('Fine Dining',    'Fine Dining',    'Fine Dining',   8)
+ON CONFLICT (id) DO NOTHING;
+
+-- Englische Textfelder für Betriebe
+ALTER TABLE unternehmen ADD COLUMN IF NOT EXISTS name_en  TEXT;
+ALTER TABLE unternehmen ADD COLUMN IF NOT EXISTS short_en TEXT;
+
 ================================================================ */
 </script>
 
@@ -622,7 +675,11 @@ ON CONFLICT (key) DO UPDATE SET de=EXCLUDED.de, en=COALESCE(translations.en,EXCL
 const { useState, useEffect, useMemo, useCallback, useRef, createContext, useContext } = React;
 
 // ── Language context ───────────────────────────────────────────
-const LangCtx = createContext({locale:'DE', setLocale:()=>{}, t:(k,f)=>f||k});
+const LangCtx = createContext({
+  locale:'DE', setLocale:()=>{}, t:(k,f)=>f||k,
+  dbTypes:[], dbTags:[],
+  typeColor:()=>'#999', typeLabel:id=>id, tagLabel:id=>id
+});
 const useLang  = () => useContext(LangCtx);
 
 const CONFIGURED = window.NFG_CONFIGURED;
@@ -852,11 +909,14 @@ function MobileNav({tab,setTab,savedCount,user,isAdmin,onAuth}) {
 
 // ── Listing card ───────────────────────────────────────────────
 function ListingCard({item,onOpen,saved,onSave,liked,likeCount,onLike}) {
+  const {locale,typeColor,typeLabel,tagLabel}=useLang();
+  const displayName  = locale==='EN'&&item.name_en  ? item.name_en  : item.name;
+  const displayShort = locale==='EN'&&item.short_en ? item.short_en : item.short;
   return <article className={'nfg-card'+(item.featured?' featured':'')} onClick={()=>onOpen(item)}>
     <div className="nfg-card-img">
       {item.photo_main
-        ? <img className="nfg-real-img" src={item.photo_main} alt={item.name} style={{height:'180px'}}/>
-        : <Ph kind={item.image||'forest'} label={`${item.type} · ${item.city}`}/>}
+        ? <img className="nfg-real-img" src={item.photo_main} alt={displayName} style={{height:'180px'}}/>
+        : <Ph kind={item.image||'forest'} label={`${typeLabel(item.type)} · ${item.city}`}/>}
       {item.score!=null&&<div className="nfg-score"><b>{item.score}</b><span>/10</span></div>}
       {item.top50&&<div className="nfg-badge-top50">Top 50 Farmers</div>}
       <button className={'nfg-save'+(saved?' on':'')} onClick={e=>{e.stopPropagation();onSave(item.id);}}>
@@ -865,13 +925,13 @@ function ListingCard({item,onOpen,saved,onSave,liked,likeCount,onLike}) {
     </div>
     <div className="nfg-card-body">
       <div className="nfg-card-meta">
-        <span className="nfg-card-type"><i style={{background:TYPE_DOT(item.type)}}/> {item.type}</span>
+        <span className="nfg-card-type"><i style={{background:typeColor(item.type)}}/> {typeLabel(item.type)}</span>
         <span>{item.city}</span>
       </div>
-      <h3 className="nfg-card-name">{item.name}</h3>
-      <p className="nfg-card-short">{item.short}</p>
+      <h3 className="nfg-card-name">{displayName}</h3>
+      <p className="nfg-card-short">{displayShort}</p>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:6,gap:8}}>
-        <div className="nfg-card-tags" style={{margin:0,flex:1,minWidth:0}}>{(item.tags||[]).slice(0,3).map(t=><span key={t} className="nfg-card-tag">{t}</span>)}</div>
+        <div className="nfg-card-tags" style={{margin:0,flex:1,minWidth:0}}>{(item.tags||[]).slice(0,3).map(tg=><span key={tg} className="nfg-card-tag">{tagLabel(tg)}</span>)}</div>
         <button className={'nfg-card-like'+(liked?' on':'')} onClick={e=>{e.stopPropagation();onLike(item.id);}}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill={liked?'currentColor':'none'} stroke="currentColor" strokeWidth="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
           {likeCount>0&&<span>{likeCount}</span>}
@@ -892,7 +952,9 @@ const NFG_RELATIONS = {
 };
 
 function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth,liked,likeCount,onLike,onTrack}) {
-  const {t}=useLang();
+  const {t,locale,typeColor,typeLabel,tagLabel}=useLang();
+  const displayName  = locale==='EN'&&item.name_en  ? item.name_en  : item.name;
+  const displayShort = locale==='EN'&&item.short_en ? item.short_en : item.short;
   const rel = NFG_RELATIONS[item.id]||{sources:[],delivers:[]};
   const byId = id => listings.find(x=>x.id===id);
   const [comments,setComments]=useState([]);
@@ -942,11 +1004,11 @@ function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth,liked,li
       </div>
       <div className="nfg-profile-body">
         <div className="nfg-profile-meta">
-          <span className="nfg-card-type"><i style={{background:TYPE_DOT(item.type)}}/> {item.type}</span>
+          <span className="nfg-card-type"><i style={{background:typeColor(item.type)}}/> {typeLabel(item.type)}</span>
           <span>·</span><span>{item.city}{item.region?`, ${item.region}`:''}</span>
         </div>
-        <h1 className="nfg-profile-name">{item.name}</h1>
-        <p className="nfg-profile-short">{item.short}</p>
+        <h1 className="nfg-profile-name">{displayName}</h1>
+        <p className="nfg-profile-short">{displayShort}</p>
         {item.score!=null&&<div className="nfg-profile-score">
           <div className="nfg-profile-score-num"><b>{item.score}</b><span>/10</span></div>
           <div><div className="nfg-profile-score-lbl">{t('profile.rating_lbl','NFG-Bewertung')}</div><a href="#kriterien" className="nfg-link">{t('profile.criteria_link','Kriterien →')}</a></div>
@@ -984,12 +1046,12 @@ function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth,liked,li
         </section>}
         <section className="nfg-section">
           <h3 className="nfg-section-h">{t('profile.tags','Tags')}</h3>
-          <div className="nfg-card-tags">{(item.tags||[]).map(t=><span key={t} className="nfg-card-tag">{t}</span>)}</div>
+          <div className="nfg-card-tags">{(item.tags||[]).map(tg=><span key={tg} className="nfg-card-tag">{tagLabel(tg)}</span>)}</div>
         </section>
         {(rel.sources.length>0||rel.delivers.length>0)&&<section className="nfg-section">
           <h3 className="nfg-section-h">{t('profile.relations','Beziehungen')}</h3>
-          {rel.sources.length>0&&<div className="nfg-rel"><div className="nfg-rel-lbl">{t('profile.sources','Bezieht von')}</div><div className="nfg-rel-row">{rel.sources.map(id=>{const r=byId(id);return r&&<button key={id} className="nfg-rel-chip" onClick={()=>onOpen(r)}><i style={{background:TYPE_DOT(r.type)}}/>{r.name}</button>;})}</div></div>}
-          {rel.delivers.length>0&&<div className="nfg-rel"><div className="nfg-rel-lbl">{t('profile.delivers','Liefert an')}</div><div className="nfg-rel-row">{rel.delivers.map(id=>{const r=byId(id);return r&&<button key={id} className="nfg-rel-chip" onClick={()=>onOpen(r)}><i style={{background:TYPE_DOT(r.type)}}/>{r.name}</button>;})}</div></div>}
+          {rel.sources.length>0&&<div className="nfg-rel"><div className="nfg-rel-lbl">{t('profile.sources','Bezieht von')}</div><div className="nfg-rel-row">{rel.sources.map(id=>{const r=byId(id);return r&&<button key={id} className="nfg-rel-chip" onClick={()=>onOpen(r)}><i style={{background:typeColor(r.type)}}/>{r.name}</button>;})}</div></div>}
+          {rel.delivers.length>0&&<div className="nfg-rel"><div className="nfg-rel-lbl">{t('profile.delivers','Liefert an')}</div><div className="nfg-rel-row">{rel.delivers.map(id=>{const r=byId(id);return r&&<button key={id} className="nfg-rel-chip" onClick={()=>onOpen(r)}><i style={{background:typeColor(r.type)}}/>{r.name}</button>;})}</div></div>}
         </section>}
         <section className="nfg-section">
           <h3 className="nfg-section-h">{t('profile.comments_h','Kommentare & Bewertungen')} {!cLoading&&`(${comments.length})`}</h3>
@@ -1022,7 +1084,9 @@ function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth,liked,li
 
 // ── Swiss map ──────────────────────────────────────────────────
 function SwissMap({items,onPick,focusId}) {
+  const {typeColor,dbTypes}=useLang();
   const proj=(lat,lng)=>[((lng-5.9)/(10.5-5.9))*360+12,((47.8-lat)/(47.8-45.8))*180+12];
+  const legendItems=dbTypes.length>0?dbTypes.map(dt=>({id:dt.id,label:dt.name_de,color:dt.color})):CATEGORIES.map(c=>({id:c.id,label:c.label,color:TYPE_COLORS[c.id]}));
   return <div className="nfg-map-wrap">
     <svg viewBox="0 0 384 204" className="nfg-map">
       <defs><pattern id="topo" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="0.5" fill="#000" opacity="0.1"/></pattern></defs>
@@ -1030,16 +1094,18 @@ function SwissMap({items,onPick,focusId}) {
       <path d="M40,80 C45,55 70,40 100,42 C120,28 145,30 165,40 C185,32 210,30 235,40 C260,35 295,38 330,55 C355,65 365,85 360,110 C355,135 330,150 305,148 C285,160 255,165 230,158 C205,168 175,170 150,160 C125,170 95,168 70,155 C50,148 35,130 38,110 Z" fill="url(#topo)"/>
       <ellipse cx="155" cy="115" rx="22" ry="6" fill="#a8bfc9" opacity="0.6"/>
       <ellipse cx="105" cy="135" rx="20" ry="5" fill="#a8bfc9" opacity="0.6"/>
-      {items.map(it=>{const[x,y]=proj(it.lat||47,it.lng||8.3);const f=focusId===it.id;return <g key={it.id} transform={`translate(${x},${y})`} onClick={()=>onPick(it)} style={{cursor:'pointer'}}>{f&&<circle r="14" fill={TYPE_DOT(it.type)} opacity="0.3"/>}<circle r={f?8:5} fill={TYPE_DOT(it.type)} stroke="#000" strokeWidth="1.5"/></g>;})}
+      {items.map(it=>{const[x,y]=proj(it.lat||47,it.lng||8.3);const f=focusId===it.id;return <g key={it.id} transform={`translate(${x},${y})`} onClick={()=>onPick(it)} style={{cursor:'pointer'}}>{f&&<circle r="14" fill={typeColor(it.type)} opacity="0.3"/>}<circle r={f?8:5} fill={typeColor(it.type)} stroke="#000" strokeWidth="1.5"/></g>;})}
       {[['Zürich',215,78],['Bern',145,110],['Basel',145,65],['Genf',60,165],['Lugano',245,175],['Chur',285,110]].map(([n,x,y])=><text key={n} x={x} y={y} fontSize="7" fill="#000" opacity="0.45" fontFamily="system-ui" fontWeight="600">{n}</text>)}
     </svg>
-    <div className="nfg-map-legend">{CATEGORIES.map(c=><span key={c.id}><i style={{background:TYPE_COLORS[c.id]}}/>{c.label}</span>)}</div>
+    <div className="nfg-map-legend">{legendItems.map(c=><span key={c.id}><i style={{background:c.color}}/>{c.label}</span>)}</div>
   </div>;
 }
 
 // ── Guide page ─────────────────────────────────────────────────
 function GuidePage({listings,saved,onSave,onOpen,onLike,likeCounts,myLikes}) {
-  const {t,locale,setLocale}=useLang();
+  const {t,locale,setLocale,dbTypes,dbTags,typeColor,typeLabel,tagLabel}=useLang();
+  const categories=useMemo(()=>dbTypes.length>0?dbTypes.map(dt=>({id:dt.id,label:locale==='EN'&&dt.name_en?dt.name_en:dt.name_de})):CATEGORIES,[dbTypes,locale]);
+  const availableTags=useMemo(()=>dbTags.length>0?dbTags.map(dt=>dt.id):TAGS_LIST,[dbTags]);
   const [view,setView]=useState('list');
   const [query,setQuery]=useState('');
   const [cats,setCats]=useState(['Restaurant']);
@@ -1069,18 +1135,18 @@ function GuidePage({listings,saved,onSave,onOpen,onLike,likeCounts,myLikes}) {
       </div>
     </header>
     <div className="nfg-toolbar">
-      <div className="nfg-cats">{CATEGORIES.map(c=>{const a=cats.includes(c.id);return <button key={c.id} className={'nfg-cat'+(a?' on':'')} onClick={()=>togCat(c.id)} style={a?{background:TYPE_COLORS[c.id],color:'#000',borderColor:'#000'}:{}}><span className="nfg-cat-dot" style={{background:TYPE_COLORS[c.id]}}/>{c.label}</button>;})}</div>
+      <div className="nfg-cats">{categories.map(c=>{const a=cats.includes(c.id);return <button key={c.id} className={'nfg-cat'+(a?' on':'')} onClick={()=>togCat(c.id)} style={a?{background:typeColor(c.id),color:'#000',borderColor:'#000'}:{}}><span className="nfg-cat-dot" style={{background:typeColor(c.id)}}/>{c.label}</button>;})}</div>
       <div className="nfg-toolbar-row">
         <select className="nfg-select" value={city} onChange={e=>setCity(e.target.value)}><option value="">{t('guide.all_locations','Alle Standorte')}</option>{cities.map(c=><option key={c} value={c}>{c}</option>)}</select>
         <div className="nfg-viewtoggle"><button className={view==='list'?'on':''} onClick={()=>setView('list')}>{t('guide.list_view','Liste')}</button><button className={view==='map'?'on':''} onClick={()=>setView('map')}>{t('guide.map_view','Karte')}</button></div>
       </div>
-      <div className="nfg-tags">{TAGS_LIST.map(t=><button key={t} className={'nfg-tag'+(tags.includes(t)?' on':'')} onClick={()=>togTag(t)}>{tags.includes(t)?'✓ ':'+ '}{t}</button>)}</div>
+      <div className="nfg-tags">{availableTags.map(tg=><button key={tg} className={'nfg-tag'+(tags.includes(tg)?' on':'')} onClick={()=>togTag(tg)}>{tags.includes(tg)?'✓ ':'+ '}{tagLabel(tg)}</button>)}</div>
     </div>
     {view==='map'?<div className="nfg-map-section">
       <SwissMap items={filtered} onPick={it=>setFocusId(it.id)} focusId={focusId}/>
-      {focusId?(()=>{const it=filtered.find(x=>x.id===focusId);return it&&<div className="nfg-map-pop" onClick={()=>onOpen(it)}><div><Ph kind={it.image} label={it.type}/></div><div><div className="nfg-card-meta"><span className="nfg-card-type"><i style={{background:TYPE_DOT(it.type)}}/>{it.type}</span><span>{it.city}</span></div><h4>{it.name}</h4><p>{it.short}</p><span className="nfg-link">{t('guide.profile_link','Profil →')}</span></div></div>;})():<div className="nfg-map-hint">{t('guide.map_hint','Tipp: Pin anklicken für Kurzinfo.')}</div>}
+      {focusId?(()=>{const it=filtered.find(x=>x.id===focusId);return it&&<div className="nfg-map-pop" onClick={()=>onOpen(it)}><div><Ph kind={it.image} label={typeLabel(it.type)}/></div><div><div className="nfg-card-meta"><span className="nfg-card-type"><i style={{background:typeColor(it.type)}}/>{typeLabel(it.type)}</span><span>{it.city}</span></div><h4>{locale==='EN'&&it.name_en?it.name_en:it.name}</h4><p>{locale==='EN'&&it.short_en?it.short_en:it.short}</p><span className="nfg-link">{t('guide.profile_link','Profil →')}</span></div></div>;})():<div className="nfg-map-hint">{t('guide.map_hint','Tipp: Pin anklicken für Kurzinfo.')}</div>}
     </div>:<div className="nfg-content">
-      <div className="nfg-result-head"><span><b>{filtered.length}</b> Einträge</span><span>{cats.length===1?CATEGORIES.find(c=>c.id===cats[0])?.label:t('guide.mixed','gemischt')}</span></div>
+      <div className="nfg-result-head"><span><b>{filtered.length}</b> Einträge</span><span>{cats.length===1?categories.find(c=>c.id===cats[0])?.label:t('guide.mixed','gemischt')}</span></div>
       <div className="nfg-list">
         {filtered.map(it=><ListingCard key={it.id} item={it} onOpen={onOpen} saved={saved.includes(it.id)} onSave={onSave} liked={myLikes.has(it.id)} likeCount={likeCounts[it.id]||0} onLike={onLike}/>)}
         {filtered.length===0&&<div className="nfg-empty">{listings.length===0?t('guide.no_entries','Noch keine Einträge. Gehe zu «Verwalten» um Betriebe hinzuzufügen.'):t('guide.no_results','Keine Treffer. Filter anpassen.')}</div>}
@@ -1193,7 +1259,7 @@ function MehrPage({events,magazine,onTrack}) {
 }
 
 // ── Listing form modal ─────────────────────────────────────────
-const EMPTY_FORM = {name:'',type:'Restaurant',city:'',region:'',lat:'',lng:'',tags:'',score:'',short:'',book:false,image:'forest',featured:false,date:'',top50:false,photo_main:'',photos:[],booking_url:'',website_url:'',address:'',phone:'',email:''};
+const EMPTY_FORM = {name:'',name_en:'',type:'Restaurant',city:'',region:'',lat:'',lng:'',tags:[],score:'',short:'',short_en:'',book:false,image:'forest',featured:false,date:'',top50:false,photo_main:'',photos:[],booking_url:'',website_url:'',address:'',phone:'',email:''};
 
 // ── Image upload slot ───────────────────────────────────────────
 function ImageSlot({url,label,onUpload,onRemove,itemId,slot}) {
@@ -1224,9 +1290,15 @@ function ImageSlot({url,label,onUpload,onRemove,itemId,slot}) {
 }
 
 function ListingFormModal({initial,onClose,onSave}) {
+  const {dbTypes,dbTags}=useLang();
+  const typeOptions=dbTypes.length>0?dbTypes.map(dt=>dt.id):TYPES;
+  const tagOptions=dbTags.length>0?dbTags.map(dt=>({id:dt.id,label:dt.name_de})):TAGS_LIST.map(t=>({id:t,label:t}));
+  const [formLang,setFormLang]=useState('DE');
   const [f,setF]=useState(()=>initial?{
     ...EMPTY_FORM,...initial,
-    tags:Array.isArray(initial.tags)?initial.tags.join(', '):'',
+    name_en:initial.name_en||'',
+    short_en:initial.short_en||'',
+    tags:Array.isArray(initial.tags)?initial.tags:(initial.tags?initial.tags.split(',').map(t=>t.trim()).filter(Boolean):[]),
     score:initial.score!=null?String(initial.score):'',
     lat:initial.lat?String(initial.lat):'',
     lng:initial.lng?String(initial.lng):'',
@@ -1243,6 +1315,7 @@ function ListingFormModal({initial,onClose,onSave}) {
   const [err,setErr]=useState('');
   const [saving,setSaving]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const togTag=id=>setF(p=>({...p,tags:p.tags.includes(id)?p.tags.filter(x=>x!==id):[...p.tags,id]}));
   const itemId=initial?.id||(f.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'new');
 
   const setPhoto=(idx,url)=>{
@@ -1262,12 +1335,12 @@ function ListingFormModal({initial,onClose,onSave}) {
     setSaving(true);
     const listing={
       id:initial?.id||(f.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'-'+uid().slice(0,4)),
-      name:f.name.trim(),type:f.type,city:f.city.trim(),
+      name:f.name.trim(),name_en:f.name_en.trim()||null,type:f.type,city:f.city.trim(),
       region:f.region.trim().toUpperCase().slice(0,2),
       lat:parseFloat(f.lat)||47.0, lng:parseFloat(f.lng)||8.3,
-      tags:f.tags.split(',').map(t=>t.trim()).filter(Boolean),
+      tags:Array.isArray(f.tags)?f.tags:f.tags.split(',').map(t=>t.trim()).filter(Boolean),
       score:f.score?parseInt(f.score):null,
-      short:f.short.trim(),book:f.book,image:f.image,
+      short:f.short.trim(),short_en:f.short_en.trim()||null,book:f.book,image:f.image,
       featured:f.featured,top50:f.top50,
       date:f.date.trim()||null,
       photo_main:f.photo_main||null,
@@ -1292,14 +1365,28 @@ function ListingFormModal({initial,onClose,onSave}) {
       <button className="nfg-form-close" onClick={onClose}>×</button>
       <h2 className="nfg-form-title">{initial?'Eintrag bearbeiten':'Neuer Eintrag'}</h2>
       <form onSubmit={submit}>
-        <div className="nfg-form-row one"><label className="nfg-label">Name *<input {...inp} value={f.name} onChange={e=>set('name',e.target.value)} required placeholder="z.B. Restaurant Zum Brunnen"/></label></div>
-        <div className="nfg-form-row three">
-          <label className="nfg-label">Typ *<select {...sel} value={f.type} onChange={e=>set('type',e.target.value)}>{TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></label>
-          <label className="nfg-label">Stadt *<input {...inp} value={f.city} onChange={e=>set('city',e.target.value)} required placeholder="Zürich"/></label>
-          <label className="nfg-label">Kanton<input {...inp} value={f.region} onChange={e=>set('region',e.target.value)} placeholder="ZH" maxLength={2}/></label>
+        <div style={{display:'flex',gap:6,marginBottom:20,background:'#f0f0f0',borderRadius:10,padding:3,width:'fit-content'}}>
+          {['DE','EN'].map(l=><button key={l} type="button" onClick={()=>setFormLang(l)} style={{border:'none',borderRadius:8,padding:'6px 18px',fontFamily:'inherit',fontSize:13,fontWeight:700,cursor:'pointer',background:formLang===l?'#000':'transparent',color:formLang===l?'#fff':'#666'}}>{l}</button>)}
         </div>
-        <div className="nfg-form-row one"><label className="nfg-label">Kurzbeschreibung *<textarea className="nfg-textarea" value={f.short} onChange={e=>set('short',e.target.value)} required placeholder="Kurze Beschreibung des Betriebs…"/></label></div>
-        <div className="nfg-form-row one"><label className="nfg-label">Tags (kommagetrennt)<input {...inp} value={f.tags} onChange={e=>set('tags',e.target.value)} placeholder="Bio, Saisonal, Regenerativ"/></label></div>
+        {formLang==='DE'?<>
+          <div className="nfg-form-row one"><label className="nfg-label">Name (DE) *<input {...inp} value={f.name} onChange={e=>set('name',e.target.value)} required placeholder="z.B. Restaurant Zum Brunnen"/></label></div>
+          <div className="nfg-form-row three">
+            <label className="nfg-label">Typ *<select {...sel} value={f.type} onChange={e=>set('type',e.target.value)}>{typeOptions.map(t=><option key={t} value={t}>{t}</option>)}</select></label>
+            <label className="nfg-label">Stadt *<input {...inp} value={f.city} onChange={e=>set('city',e.target.value)} required placeholder="Zürich"/></label>
+            <label className="nfg-label">Kanton<input {...inp} value={f.region} onChange={e=>set('region',e.target.value)} placeholder="ZH" maxLength={2}/></label>
+          </div>
+          <div className="nfg-form-row one"><label className="nfg-label">Kurzbeschreibung (DE) *<textarea className="nfg-textarea" value={f.short} onChange={e=>set('short',e.target.value)} required placeholder="Kurze Beschreibung des Betriebs…"/></label></div>
+        </>:<>
+          <div className="nfg-form-row one"><label className="nfg-label">Name (EN)<small style={{fontWeight:400,color:'#888',marginLeft:6}}>Leer = DE wird angezeigt</small><input {...inp} value={f.name_en} onChange={e=>set('name_en',e.target.value)} placeholder="e.g. Restaurant Zum Brunnen"/></label></div>
+          <div className="nfg-form-row three">
+            <label className="nfg-label">Typ *<select {...sel} value={f.type} onChange={e=>set('type',e.target.value)}>{typeOptions.map(t=><option key={t} value={t}>{t}</option>)}</select></label>
+            <label className="nfg-label">Stadt *<input {...inp} value={f.city} onChange={e=>set('city',e.target.value)} required placeholder="Zürich"/></label>
+            <label className="nfg-label">Kanton<input {...inp} value={f.region} onChange={e=>set('region',e.target.value)} placeholder="ZH" maxLength={2}/></label>
+          </div>
+          <div className="nfg-form-row one"><label className="nfg-label">Kurzbeschreibung (EN)<small style={{fontWeight:400,color:'#888',marginLeft:6}}>Leer = DE wird angezeigt</small><textarea className="nfg-textarea" value={f.short_en} onChange={e=>set('short_en',e.target.value)} placeholder="Short description of the business…"/></label></div>
+        </>}
+        <div className="nfg-form-section-h">Tags</div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:16}}>{tagOptions.map(({id,label})=><label key={id} style={{display:'flex',alignItems:'center',gap:6,background:f.tags.includes(id)?'var(--nfg-accent)':'#f5f5f5',border:f.tags.includes(id)?'2px solid #000':'2px solid transparent',borderRadius:999,padding:'5px 12px',cursor:'pointer',fontSize:13,fontWeight:600}}><input type="checkbox" style={{display:'none'}} checked={f.tags.includes(id)} onChange={()=>togTag(id)}/>{label}</label>)}</div>
 
         <div className="nfg-form-section-h">Bilder</div>
         <div className="nfg-img-grid">
@@ -1497,6 +1584,8 @@ function EventsTab({events,setEvents}) {
 
 // ── Verwalten — Betriebe tab ────────────────────────────────────
 function BetriebeTab({listings,setListings}) {
+  const {dbTypes,typeColor}=useLang();
+  const typeOptions=dbTypes.length>0?dbTypes.map(dt=>dt.id):TYPES;
   const [filterType,setFilterType]=useState('');
   const [search,setSearch]=useState('');
   const [formItem,setFormItem]=useState(null);
@@ -1540,7 +1629,7 @@ function BetriebeTab({listings,setListings}) {
         </div>
         <select className="nfg-select" value={filterType} onChange={e=>setFilterType(e.target.value)} style={{minWidth:160}}>
           <option value="">Alle Typen</option>
-          {TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+          {typeOptions.map(t=><option key={t} value={t}>{t}</option>)}
         </select>
       </div>
       <button className="nfg-btn-primary" onClick={()=>setFormItem(false)}>+ Neuer Eintrag</button>
@@ -1548,7 +1637,7 @@ function BetriebeTab({listings,setListings}) {
     {visible.length===0&&<div className="nfg-empty">{listings.length===0?'Noch keine Einträge. Erstelle den ersten Betrieb.':'Keine Einträge gefunden.'}</div>}
     <div className="nfg-admin-list">
       {visible.map(it=><div key={it.id} className="nfg-admin-item">
-        <div className="nfg-admin-dot" style={{background:TYPE_DOT(it.type)}}/>
+        <div className="nfg-admin-dot" style={{background:typeColor(it.type)}}/>
         <div className="nfg-admin-info">
           <div className="nfg-admin-name">{it.name}</div>
           <div className="nfg-admin-meta">{it.type} · {it.city}{it.region?`, ${it.region}`:''}{it.score!=null?` · Score ${it.score}/10`:''}{it.date?` · ${it.date}`:''}</div>
@@ -1835,6 +1924,215 @@ function MagazineTab({magazine,setMagazine}) {
   </>;
 }
 
+// ── Verwalten — Typen form modal ───────────────────────────────
+function TypeFormModal({initial,onClose,onSave}) {
+  const [f,setF]=useState(initial?{...initial}:{id:'',name_de:'',name_en:'',color:'#999999',sort_order:0});
+  const [err,setErr]=useState('');
+  const [saving,setSaving]=useState(false);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const submit=async e=>{
+    e.preventDefault(); setErr('');
+    if(!f.id.trim()){setErr('ID ist erforderlich.');return;}
+    if(!f.name_de.trim()){setErr('Deutscher Name ist erforderlich.');return;}
+    setSaving(true);
+    const payload={id:f.id.trim(),name_de:f.name_de.trim(),name_en:f.name_en.trim()||null,color:f.color||'#999999',sort_order:parseInt(f.sort_order)||0};
+    const errMsg=await onSave(payload,!!initial);
+    setSaving(false);
+    if(errMsg){setErr(errMsg);return;}
+    onClose();
+  };
+  const inp={className:'nfg-input'};
+  return <div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&onClose()}>
+    <div className="nfg-form-sheet" style={{maxWidth:480}}>
+      <button className="nfg-form-close" onClick={onClose}>×</button>
+      <h2 className="nfg-form-title">{initial?'Typ bearbeiten':'Neuer Typ'}</h2>
+      <form onSubmit={submit}>
+        <div className="nfg-form-row one"><label className="nfg-label">ID (eindeutig) *<input {...inp} value={f.id} onChange={e=>set('id',e.target.value)} required disabled={!!initial} placeholder="z.B. Restaurant"/></label></div>
+        <div className="nfg-form-row">
+          <label className="nfg-label">Name DE *<input {...inp} value={f.name_de} onChange={e=>set('name_de',e.target.value)} required placeholder="Restaurant"/></label>
+          <label className="nfg-label">Name EN<input {...inp} value={f.name_en} onChange={e=>set('name_en',e.target.value)} placeholder="Restaurant"/></label>
+        </div>
+        <div className="nfg-form-row">
+          <label className="nfg-label">Farbe<input {...inp} type="color" value={f.color} onChange={e=>set('color',e.target.value)} style={{width:60,padding:'4px 6px',cursor:'pointer'}}/></label>
+          <label className="nfg-label">Reihenfolge<input {...inp} type="number" value={f.sort_order} onChange={e=>set('sort_order',e.target.value)} placeholder="0"/></label>
+        </div>
+        {err&&<p className="nfg-err">{err}</p>}
+        <div className="nfg-form-actions">
+          <button className="nfg-btn-primary" type="submit" disabled={saving} style={{opacity:saving?0.7:1}}>{saving?'Speichern…':initial?'Speichern':'Typ erstellen'}</button>
+          <button className="nfg-btn-ghost" type="button" onClick={onClose}>Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>;
+}
+
+// ── Verwalten — Tags form modal ────────────────────────────────
+function TagFormModal({initial,onClose,onSave}) {
+  const [f,setF]=useState(initial?{...initial}:{id:'',name_de:'',name_en:'',sort_order:0});
+  const [err,setErr]=useState('');
+  const [saving,setSaving]=useState(false);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const submit=async e=>{
+    e.preventDefault(); setErr('');
+    if(!f.id.trim()){setErr('ID ist erforderlich.');return;}
+    if(!f.name_de.trim()){setErr('Deutscher Name ist erforderlich.');return;}
+    setSaving(true);
+    const payload={id:f.id.trim(),name_de:f.name_de.trim(),name_en:f.name_en.trim()||null,sort_order:parseInt(f.sort_order)||0};
+    const errMsg=await onSave(payload,!!initial);
+    setSaving(false);
+    if(errMsg){setErr(errMsg);return;}
+    onClose();
+  };
+  const inp={className:'nfg-input'};
+  return <div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&onClose()}>
+    <div className="nfg-form-sheet" style={{maxWidth:480}}>
+      <button className="nfg-form-close" onClick={onClose}>×</button>
+      <h2 className="nfg-form-title">{initial?'Tag bearbeiten':'Neuer Tag'}</h2>
+      <form onSubmit={submit}>
+        <div className="nfg-form-row one"><label className="nfg-label">ID (eindeutig) *<input {...inp} value={f.id} onChange={e=>set('id',e.target.value)} required disabled={!!initial} placeholder="z.B. Bio"/></label></div>
+        <div className="nfg-form-row">
+          <label className="nfg-label">Name DE *<input {...inp} value={f.name_de} onChange={e=>set('name_de',e.target.value)} required placeholder="Bio"/></label>
+          <label className="nfg-label">Name EN<input {...inp} value={f.name_en} onChange={e=>set('name_en',e.target.value)} placeholder="Organic"/></label>
+        </div>
+        <div className="nfg-form-row one"><label className="nfg-label">Reihenfolge<input {...inp} type="number" value={f.sort_order} onChange={e=>set('sort_order',e.target.value)} placeholder="0"/></label></div>
+        {err&&<p className="nfg-err">{err}</p>}
+        <div className="nfg-form-actions">
+          <button className="nfg-btn-primary" type="submit" disabled={saving} style={{opacity:saving?0.7:1}}>{saving?'Speichern…':initial?'Speichern':'Tag erstellen'}</button>
+          <button className="nfg-btn-ghost" type="button" onClick={onClose}>Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>;
+}
+
+// ── Verwalten — Typen tab ──────────────────────────────────────
+function TypenTab({dbTypes,setDbTypes}) {
+  const [formItem,setFormItem]=useState(null);
+  const [confirmDel,setConfirmDel]=useState(null);
+  const [deleting,setDeleting]=useState(false);
+  const sorted=[...dbTypes].sort((a,b)=>a.sort_order-b.sort_order);
+
+  const handleSave=async(payload,isEdit)=>{
+    if(isEdit){
+      const{id,...data}=payload;
+      const{data:row,error}=await db.from('types').update(data).eq('id',id).select().single();
+      if(error)return error.message;
+      setDbTypes(prev=>prev.map(x=>x.id===id?row:x));
+    }else{
+      const{data:row,error}=await db.from('types').insert(payload).select().single();
+      if(error)return error.message;
+      setDbTypes(prev=>[...prev,row]);
+    }
+    return null;
+  };
+
+  const handleDelete=async id=>{
+    setDeleting(true);
+    await db.from('types').delete().eq('id',id);
+    setDbTypes(prev=>prev.filter(x=>x.id!==id));
+    setDeleting(false); setConfirmDel(null);
+  };
+
+  return <>
+    <p className="nfg-page-sub">{dbTypes.length} Typen definiert</p>
+    <div className="nfg-admin-bar">
+      <div/>
+      <button className="nfg-btn-primary" onClick={()=>setFormItem(false)}>+ Neuer Typ</button>
+    </div>
+    {sorted.length===0&&<div className="nfg-empty">Noch keine Typen. SQL-Migration ausführen oder manuell anlegen.</div>}
+    <div className="nfg-admin-list">
+      {sorted.map(dt=><div key={dt.id} className="nfg-admin-item">
+        <div className="nfg-admin-dot" style={{background:dt.color||'#999'}}/>
+        <div className="nfg-admin-info">
+          <div className="nfg-admin-name">{dt.name_de}{dt.name_en?<span style={{color:'#888',fontWeight:400}}> / {dt.name_en}</span>:null}</div>
+          <div className="nfg-admin-meta">ID: {dt.id} · Farbe: {dt.color} · Reihenfolge: {dt.sort_order}</div>
+        </div>
+        <div className="nfg-admin-actions">
+          <button className="nfg-btn-sm nfg-btn-sm-edit" onClick={()=>setFormItem(dt)}>Bearbeiten</button>
+          <button className="nfg-btn-sm nfg-btn-sm-del" onClick={()=>setConfirmDel(dt)}>Löschen</button>
+        </div>
+      </div>)}
+    </div>
+    {formItem!==null&&<TypeFormModal initial={formItem||null} onClose={()=>setFormItem(null)} onSave={handleSave}/>}
+    {confirmDel&&<div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&setConfirmDel(null)}>
+      <div className="nfg-form-sheet" style={{maxWidth:420}}>
+        <h3 style={{margin:'0 0 12px',fontSize:20,fontWeight:700}}>Typ löschen?</h3>
+        <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>„{confirmDel.name_de}" wird dauerhaft entfernt.</p>
+        <div style={{display:'flex',gap:10}}>
+          <button className="nfg-btn-primary" style={{background:'#e53e3e',borderColor:'#e53e3e',color:'#fff'}} disabled={deleting} onClick={()=>handleDelete(confirmDel.id)}>
+            {deleting?'Löschen…':'Endgültig löschen'}
+          </button>
+          <button className="nfg-btn-ghost" onClick={()=>setConfirmDel(null)}>Abbrechen</button>
+        </div>
+      </div>
+    </div>}
+  </>;
+}
+
+// ── Verwalten — Tags tab ───────────────────────────────────────
+function TagsTab({dbTags,setDbTags}) {
+  const [formItem,setFormItem]=useState(null);
+  const [confirmDel,setConfirmDel]=useState(null);
+  const [deleting,setDeleting]=useState(false);
+  const sorted=[...dbTags].sort((a,b)=>a.sort_order-b.sort_order);
+
+  const handleSave=async(payload,isEdit)=>{
+    if(isEdit){
+      const{id,...data}=payload;
+      const{data:row,error}=await db.from('tags').update(data).eq('id',id).select().single();
+      if(error)return error.message;
+      setDbTags(prev=>prev.map(x=>x.id===id?row:x));
+    }else{
+      const{data:row,error}=await db.from('tags').insert(payload).select().single();
+      if(error)return error.message;
+      setDbTags(prev=>[...prev,row]);
+    }
+    return null;
+  };
+
+  const handleDelete=async id=>{
+    setDeleting(true);
+    await db.from('tags').delete().eq('id',id);
+    setDbTags(prev=>prev.filter(x=>x.id!==id));
+    setDeleting(false); setConfirmDel(null);
+  };
+
+  return <>
+    <p className="nfg-page-sub">{dbTags.length} Tags definiert</p>
+    <div className="nfg-admin-bar">
+      <div/>
+      <button className="nfg-btn-primary" onClick={()=>setFormItem(false)}>+ Neuer Tag</button>
+    </div>
+    {sorted.length===0&&<div className="nfg-empty">Noch keine Tags. SQL-Migration ausführen oder manuell anlegen.</div>}
+    <div className="nfg-admin-list">
+      {sorted.map(dt=><div key={dt.id} className="nfg-admin-item">
+        <div className="nfg-admin-dot" style={{background:'#84cc16'}}/>
+        <div className="nfg-admin-info">
+          <div className="nfg-admin-name">{dt.name_de}{dt.name_en?<span style={{color:'#888',fontWeight:400}}> / {dt.name_en}</span>:null}</div>
+          <div className="nfg-admin-meta">ID: {dt.id} · Reihenfolge: {dt.sort_order}</div>
+        </div>
+        <div className="nfg-admin-actions">
+          <button className="nfg-btn-sm nfg-btn-sm-edit" onClick={()=>setFormItem(dt)}>Bearbeiten</button>
+          <button className="nfg-btn-sm nfg-btn-sm-del" onClick={()=>setConfirmDel(dt)}>Löschen</button>
+        </div>
+      </div>)}
+    </div>
+    {formItem!==null&&<TagFormModal initial={formItem||null} onClose={()=>setFormItem(null)} onSave={handleSave}/>}
+    {confirmDel&&<div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&setConfirmDel(null)}>
+      <div className="nfg-form-sheet" style={{maxWidth:420}}>
+        <h3 style={{margin:'0 0 12px',fontSize:20,fontWeight:700}}>Tag löschen?</h3>
+        <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>„{confirmDel.name_de}" wird dauerhaft entfernt.</p>
+        <div style={{display:'flex',gap:10}}>
+          <button className="nfg-btn-primary" style={{background:'#e53e3e',borderColor:'#e53e3e',color:'#fff'}} disabled={deleting} onClick={()=>handleDelete(confirmDel.id)}>
+            {deleting?'Löschen…':'Endgültig löschen'}
+          </button>
+          <button className="nfg-btn-ghost" onClick={()=>setConfirmDel(null)}>Abbrechen</button>
+        </div>
+      </div>
+    </div>}
+  </>;
+}
+
 // ── Verwalten — Sprache tab ────────────────────────────────────
 function SprachTab() {
   const [rows,setRows]=useState([]);
@@ -2043,12 +2341,12 @@ function AnalyticsTab({listings,events,magazine}) {
   </div>;
 }
 
-function VerwaltenPage({listings,setListings,currentUserId,events,setEvents,magazine,setMagazine}) {
+function VerwaltenPage({listings,setListings,currentUserId,events,setEvents,magazine,setMagazine,dbTypes,setDbTypes,dbTags,setDbTags}) {
   const [vtab,setVtab]=useState('betriebe');
   return <div className="nfg-page">
     <h2 className="nfg-page-h">Verwalten</h2>
     <div style={{display:'flex',gap:4,marginBottom:24,background:'#f0f0f0',borderRadius:12,padding:4,width:'fit-content',flexWrap:'wrap'}}>
-      {[['betriebe','Betriebe'],['events','Events'],['magazin','Magazin'],['user','User'],['analytics','Analytics'],['sprache','Sprache']].map(([id,lbl])=>
+      {[['betriebe','Betriebe'],['events','Events'],['magazin','Magazin'],['user','User'],['analytics','Analytics'],['typen','Typen'],['tags','Tags'],['sprache','Sprache']].map(([id,lbl])=>
         <button key={id} onClick={()=>setVtab(id)} style={{border:'none',borderRadius:9,padding:'8px 20px',fontFamily:'inherit',fontSize:14,fontWeight:700,cursor:'pointer',background:vtab===id?'#000':'transparent',color:vtab===id?'#fff':'#666',transition:'all 0.15s'}}>
           {lbl}
         </button>
@@ -2059,6 +2357,8 @@ function VerwaltenPage({listings,setListings,currentUserId,events,setEvents,maga
     {vtab==='magazin'  &&<MagazineTab magazine={magazine} setMagazine={setMagazine}/>}
     {vtab==='user'     &&<UserTab currentUserId={currentUserId}/>}
     {vtab==='analytics'&&<AnalyticsTab listings={listings} events={events} magazine={magazine}/>}
+    {vtab==='typen'    &&<TypenTab dbTypes={dbTypes} setDbTypes={setDbTypes}/>}
+    {vtab==='tags'     &&<TagsTab dbTags={dbTags} setDbTags={setDbTags}/>}
     {vtab==='sprache'  &&<SprachTab/>}
   </div>;
 }
@@ -2073,6 +2373,8 @@ function App() {
   const [magazine,setMagazine]=useState([]);
   const [locale,setLocale]=useState('DE');
   const [translations,setTranslations]=useState({});
+  const [dbTypes,setDbTypes]=useState([]);
+  const [dbTags,setDbTags]=useState([]);
   const [saved,setSaved]=useState([]);
   const savedRef=useRef([]);
   useEffect(()=>{ savedRef.current=saved; },[saved]);
@@ -2095,6 +2397,26 @@ function App() {
     if(!row) return fallbackDE||key;
     return locale==='EN'&&row.en?row.en:row.de||fallbackDE||key;
   },[translations,locale]);
+
+  // typeColor — Farbe eines Typs aus DB, Fallback auf Konstante
+  const typeColor=useCallback(id=>{
+    const dt=dbTypes.find(x=>x.id===id);
+    return dt?dt.color:TYPE_COLORS[id]||'#999';
+  },[dbTypes]);
+
+  // typeLabel — Bezeichnung eines Typs in der aktuellen Sprache
+  const typeLabel=useCallback(id=>{
+    const dt=dbTypes.find(x=>x.id===id);
+    if(!dt) return id;
+    return locale==='EN'&&dt.name_en?dt.name_en:dt.name_de;
+  },[dbTypes,locale]);
+
+  // tagLabel — Bezeichnung eines Tags in der aktuellen Sprache
+  const tagLabel=useCallback(id=>{
+    const dt=dbTags.find(x=>x.id===id);
+    if(!dt) return id;
+    return locale==='EN'&&dt.name_en?dt.name_en:dt.name_de;
+  },[dbTags,locale]);
 
   // userRef — für stabilen Zugriff in track() ohne stale closure
   const userRef=useRef(null);
@@ -2145,6 +2467,12 @@ function App() {
     });
     db.from('translations').select('*').then(({data})=>{
       if(data){ const m={}; data.forEach(r=>{m[r.key]={de:r.de,en:r.en};}); setTranslations(m); }
+    });
+    db.from('types').select('*').order('sort_order').then(({data})=>{
+      if(data&&data.length>0) setDbTypes(data);
+    });
+    db.from('tags').select('*').order('sort_order').then(({data})=>{
+      if(data&&data.length>0) setDbTags(data);
     });
     // Alle Likes laden (nur unternehmen_id für Zählung)
     db.from('likes').select('unternehmen_id').then(({data})=>{
@@ -2234,14 +2562,14 @@ function App() {
 
   if(!ready) return <Loader/>;
 
-  return <LangCtx.Provider value={{locale,setLocale,t}}>
+  return <LangCtx.Provider value={{locale,setLocale,t,dbTypes,dbTags,typeColor,typeLabel,tagLabel}}>
     <div className="nfg-shell">
       <Sidebar tab={tab} setTab={setTab} savedCount={saved.length} user={user} isAdmin={isAdmin} onAuth={onAuth} onLogout={onLogout}/>
       <main className="nfg-main">
         {tab==='guide'     &&<GuidePage {...shared}/>}
         {tab==='merkliste' &&<MerklistePage {...shared} user={user} onAuth={onAuth}/>}
         {tab==='mehr'      &&<MehrPage events={events} magazine={magazine} onTrack={track}/>}
-        {tab==='verwalten' &&isAdmin&&<VerwaltenPage listings={listings} setListings={setListings} currentUserId={user?.id} events={events} setEvents={setEvents} magazine={magazine} setMagazine={setMagazine}/>}
+        {tab==='verwalten' &&isAdmin&&<VerwaltenPage listings={listings} setListings={setListings} currentUserId={user?.id} events={events} setEvents={setEvents} magazine={magazine} setMagazine={setMagazine} dbTypes={dbTypes} setDbTypes={setDbTypes} dbTags={dbTags} setDbTags={setDbTags}/>}
         {tab==='verwalten' &&!isAdmin&&<div className="nfg-page"><h2 className="nfg-page-h">Verwalten</h2><p className="nfg-login-hint">{user?'Du hast keine Berechtigung für die Verwaltung.':'Bitte einloggen.'}</p>{!user&&<button className="nfg-btn-primary" onClick={()=>onAuth('login')}>Anmelden</button>}</div>}
       </main>
       <MobileNav tab={tab} setTab={setTab} savedCount={saved.length} user={user} isAdmin={isAdmin} onAuth={onAuth}/>
