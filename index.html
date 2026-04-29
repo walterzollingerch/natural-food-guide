@@ -211,7 +211,7 @@ body { background: var(--nfg-bg); font-family: var(--nfg-sans); color: var(--nfg
 .nfg-stat-card { background: #fff; border: 1px solid var(--nfg-line); border-radius: 14px; padding: 16px 18px; }
 .nfg-stat-icon { font-size: 20px; display: block; margin-bottom: 8px; }
 .nfg-stat-val { font-size: 28px; font-weight: 700; line-height: 1; color: #000; }
-.nfg-stat-lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #555; margin-top: 5px; }
+.nfg-stat-lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #555; margin-top: 5px; line-height: 1.35; overflow-wrap: break-word; word-break: break-word; }
 .nfg-stat-sub { font-size: 10px; color: #aaa; margin-top: 2px; }
 .nfg-analytics-h { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #666; margin: 26px 0 10px; }
 .nfg-top-list { display: flex; flex-direction: column; }
@@ -1749,87 +1749,73 @@ function TopList({rows,max}) {
 
 function AnalyticsTab({listings,events,magazine}) {
   const [loading,setLoading]=useState(true);
+  const [refreshing,setRefreshing]=useState(false);
+  const [lastUpdated,setLastUpdated]=useState(null);
   const [stats,setStats]=useState(null);
 
-  useEffect(()=>{
+  const loadData=useCallback(async(isRefresh=false)=>{
+    isRefresh?setRefreshing(true):setLoading(true);
     const since30=new Date(Date.now()-30*24*60*60*1000).toISOString();
-    Promise.all([
+    const [evRes,likesRes,commRes]=await Promise.all([
       db.from('analytics_events').select('event_type,ref_id,fingerprint,created_at').gte('created_at',since30).limit(50000),
       db.from('likes').select('unternehmen_id,created_at').limit(50000),
       db.from('comments').select('unternehmen_id,created_at').limit(50000),
-    ]).then(([evRes,likesRes,commRes])=>{
-      const evts=evRes.data||[];
-      const likes=likesRes.data||[];
-      const comms=commRes.data||[];
-
-      // Zähler nach Typ
-      const byType={};
-      evts.forEach(e=>{ byType[e.event_type]=(byType[e.event_type]||0)+1; });
-
-      // Unique visitors (distinct fingerprints bei page_view)
-      const uniqueVis=new Set(evts.filter(e=>e.event_type==='page_view').map(e=>e.fingerprint)).size;
-
-      // Top by ref_id für verschiedene Event-Typen
-      const topFor=type=>{
-        const counts={};
-        evts.filter(e=>e.event_type===type&&e.ref_id).forEach(e=>{ counts[e.ref_id]=(counts[e.ref_id]||0)+1; });
-        return counts;
-      };
-      const profileCounts=topFor('profile_view');
-      const bookingCounts=topFor('booking_click');
-      const magCounts=topFor('magazine_click');
-      const evtCounts=topFor('event_click');
-
-      // Likes / Kommentare pro Betrieb (alle Zeiten)
-      const likesByItem={};  likes.forEach(l=>{ likesByItem[l.unternehmen_id]=(likesByItem[l.unternehmen_id]||0)+1; });
-      const commsByItem={};  comms.forEach(c=>{ commsByItem[c.unternehmen_id]=(commsByItem[c.unternehmen_id]||0)+1; });
-
-      // Seitenbesuche letzte 7 Tage
-      const daily=Array.from({length:7},(_,i)=>{
-        const d=new Date(); d.setDate(d.getDate()-(6-i));
-        const day=d.toISOString().slice(0,10);
-        return {day,count:evts.filter(e=>e.event_type==='page_view'&&e.created_at.slice(0,10)===day).length};
-      });
-
-      // Likes der letzten 30 Tage
-      const likes30=likes.filter(l=>l.created_at>=since30).length;
-      const comms30=comms.filter(c=>c.created_at>=since30).length;
-
-      // Hilfsfunktion: ref_id → Name
-      const bizName=id=>listings.find(x=>x.id===id)?.name||id;
-      const magName=id=>magazine.find(x=>x.id===id)?.title||id;
-      const evName =id=>events.find(x=>x.id===id)?.title||id;
-
-      const sortedTop=(counts,nameFn,n=6)=>
-        Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,n).map(([id,c])=>[nameFn(id),c]);
-
-      setStats({
-        byType,uniqueVis,daily,likes30,comms30,
-        topProfiles:sortedTop(profileCounts,bizName),
-        topBookings:sortedTop(bookingCounts,bizName),
-        topLikes:sortedTop(likesByItem,bizName),
-        topComments:sortedTop(commsByItem,bizName),
-        topMag:sortedTop(magCounts,magName),
-        topEvt:sortedTop(evtCounts,evName),
-      });
-      setLoading(false);
+    ]);
+    const evts=evRes.data||[], likes=likesRes.data||[], comms=commRes.data||[];
+    const byType={};
+    evts.forEach(e=>{ byType[e.event_type]=(byType[e.event_type]||0)+1; });
+    const uniqueVis=new Set(evts.filter(e=>e.event_type==='page_view').map(e=>e.fingerprint)).size;
+    const topFor=type=>{ const c={}; evts.filter(e=>e.event_type===type&&e.ref_id).forEach(e=>{ c[e.ref_id]=(c[e.ref_id]||0)+1; }); return c; };
+    const likesByItem={};  likes.forEach(l=>{ likesByItem[l.unternehmen_id]=(likesByItem[l.unternehmen_id]||0)+1; });
+    const commsByItem={};  comms.forEach(c=>{ commsByItem[c.unternehmen_id]=(commsByItem[c.unternehmen_id]||0)+1; });
+    const daily=Array.from({length:7},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-(6-i)); const day=d.toISOString().slice(0,10); return {day,count:evts.filter(e=>e.event_type==='page_view'&&e.created_at.slice(0,10)===day).length}; });
+    const likes30=likes.filter(l=>l.created_at>=since30).length;
+    const comms30=comms.filter(c=>c.created_at>=since30).length;
+    const bizName=id=>listings.find(x=>x.id===id)?.name||id;
+    const magName=id=>magazine.find(x=>x.id===id)?.title||id;
+    const evName =id=>events.find(x=>x.id===id)?.title||id;
+    const sortedTop=(counts,nameFn,n=6)=>Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,n).map(([id,c])=>[nameFn(id),c]);
+    setStats({byType,uniqueVis,daily,likes30,comms30,
+      topProfiles:sortedTop(topFor('profile_view'),bizName),
+      topBookings:sortedTop(topFor('booking_click'),bizName),
+      topLikes:sortedTop(likesByItem,bizName),
+      topComments:sortedTop(commsByItem,bizName),
+      topMag:sortedTop(topFor('magazine_click'),magName),
+      topEvt:sortedTop(topFor('event_click'),evName),
     });
-  },[]);
+    setLastUpdated(new Date());
+    setLoading(false); setRefreshing(false);
+  },[listings,events,magazine]);
+
+  useEffect(()=>{ loadData(); },[]);
 
   if(loading) return <p style={{color:'#666',fontSize:14,marginTop:20}}>Lade Analytics…</p>;
   const s=stats;
   const maxTop=rows=>rows.length?rows[0][1]:1;
 
   return <div>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,flexWrap:'wrap',gap:10}}>
+      <span style={{fontSize:12,color:'#aaa'}}>
+        {lastUpdated&&`Aktualisiert: ${lastUpdated.toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'})} Uhr`}
+      </span>
+      <button className="nfg-btn-sm nfg-btn-sm-edit" onClick={()=>loadData(true)} disabled={refreshing}
+        style={{display:'flex',alignItems:'center',gap:6,opacity:refreshing?0.6:1}}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          style={{transform:refreshing?'rotate(360deg)':'none',transition:refreshing?'transform 0.8s linear':'none'}}>
+          <path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        {refreshing?'Lädt…':'Aktualisieren'}
+      </button>
+    </div>
     <div className="nfg-analytics-sum">
       <StatCard icon="👁" label="Seitenbesuche" value={s.byType['page_view']||0} sub="letzte 30 Tage"/>
       <StatCard icon="👤" label="Unique Visitors" value={s.uniqueVis} sub="letzte 30 Tage"/>
-      <StatCard icon="🏪" label="Betriebsaufrufe" value={s.byType['profile_view']||0} sub="letzte 30 Tage"/>
-      <StatCard icon="📅" label="Buchungsklicks" value={s.byType['booking_click']||0} sub="letzte 30 Tage"/>
+      <StatCard icon="🏪" label="Aufrufe" value={s.byType['profile_view']||0} sub="Betriebe · 30 Tage"/>
+      <StatCard icon="📅" label="Buchungen" value={s.byType['booking_click']||0} sub="Klicks · 30 Tage"/>
       <StatCard icon="❤️" label="Neue Likes" value={s.likes30} sub="letzte 30 Tage"/>
       <StatCard icon="💬" label="Kommentare" value={s.comms30} sub="letzte 30 Tage"/>
-      <StatCard icon="📖" label="Magazin-Klicks" value={s.byType['magazine_click']||0} sub="letzte 30 Tage"/>
-      <StatCard icon="🎟" label="Event-Klicks" value={s.byType['event_click']||0} sub="letzte 30 Tage"/>
+      <StatCard icon="📖" label="Magazin" value={s.byType['magazine_click']||0} sub="Klicks · 30 Tage"/>
+      <StatCard icon="🎟" label="Events" value={s.byType['event_click']||0} sub="Klicks · 30 Tage"/>
     </div>
 
     <div className="nfg-analytics-h">Seitenbesuche — letzte 7 Tage</div>
