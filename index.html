@@ -404,7 +404,7 @@ $$;
 </script>
 
 <script type="text/babel">
-const { useState, useEffect, useMemo, useCallback } = React;
+const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
 const CONFIGURED = window.NFG_CONFIGURED;
 const db = CONFIGURED
@@ -494,7 +494,7 @@ function Loader() {
 }
 
 // ── Auth modal ─────────────────────────────────────────────────
-function AuthModal({mode='login',onClose,onAuth}) {
+function AuthModal({mode='login',hint,onClose,onAuth}) {
   const [view,setView]=useState(mode);
   const [name,setName]=useState('');
   const [email,setEmail]=useState('');
@@ -520,9 +520,12 @@ function AuthModal({mode='login',onClose,onAuth}) {
   const swap = () => { setView(v=>v==='login'?'register':'login'); setErr(''); };
   const inp = {className:'nfg-input'};
 
-  return <div className="nfg-profile" onClick={e=>e.target.classList.contains('nfg-profile')&&onClose()}>
+  return <div className="nfg-profile" style={{zIndex:300}} onClick={e=>e.target.classList.contains('nfg-profile')&&onClose()}>
     <div className="nfg-auth-sheet">
       <button className="nfg-profile-close" onClick={onClose}>×</button>
+      {hint&&<div style={{background:'#f0f7e6',border:'1.5px solid #b6d97a',borderRadius:10,padding:'10px 14px',marginBottom:20,fontSize:13,color:'#3a5a00',display:'flex',alignItems:'center',gap:8}}>
+        <span style={{fontSize:16}}>🔒</span>{hint}
+      </div>}
       <h2 style={{margin:'0 0 4px',fontSize:26,fontWeight:700}}>{view==='login'?'Anmelden':'Registrieren'}</h2>
       <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>Natural Food Guide · Soil to Soul</p>
       <form onSubmit={view==='login'?doLogin:doRegister} style={{display:'flex',flexDirection:'column',gap:14}}>
@@ -1194,6 +1197,8 @@ function App() {
   const [userRole,setUserRole]=useState(null);
   const [listings,setListings]=useState([]);
   const [saved,setSaved]=useState([]);
+  const savedRef=useRef([]);
+  useEffect(()=>{ savedRef.current=saved; },[saved]);
   const [tab,setTab]=useState('guide');
   const [open,setOpen]=useState(null);
   const [authModal,setAuthModal]=useState(null);
@@ -1242,14 +1247,13 @@ function App() {
   },[tab]);
 
   const onSave=useCallback(async id=>{
-    if(!user){setAuthModal('login');return;}
-    setSaved(prev=>{
-      const willSave=!prev.includes(id);
-      const next=willSave?[...prev,id]:prev.filter(x=>x!==id);
-      if(willSave) db.from('saved_items').insert({user_id:user.id,unternehmen_id:id}).catch(()=>setSaved(p=>p.filter(x=>x!==id)));
-      else db.from('saved_items').delete().eq('user_id',user.id).eq('unternehmen_id',id).catch(()=>setSaved(p=>[...p,id]));
-      return next;
-    });
+    if(!user){setAuthModal({mode:'login',hint:'Bitte melde dich an, um Betriebe zu merken.'});return;}
+    const willSave=!savedRef.current.includes(id);
+    setSaved(prev=>willSave?[...prev,id]:prev.filter(x=>x!==id));
+    const {error}=willSave
+      ?await db.from('saved_items').insert({user_id:user.id,unternehmen_id:id})
+      :await db.from('saved_items').delete().eq('user_id',user.id).eq('unternehmen_id',id);
+    if(error) setSaved(prev=>willSave?prev.filter(x=>x!==id):[...prev,id]);
   },[user]);
 
   const shared={listings,saved,onSave,onOpen:setOpen};
@@ -1268,7 +1272,7 @@ function App() {
     </main>
     <MobileNav tab={tab} setTab={setTab} savedCount={saved.length} user={user} isAdmin={isAdmin} onAuth={onAuth}/>
     {open&&listings.find(x=>x.id===open.id)&&<Profile item={open} listings={listings} onClose={()=>setOpen(null)} saved={saved.includes(open.id)} onSave={onSave} onOpen={setOpen} user={user} onAuth={onAuth}/>}
-    {authModal&&<AuthModal mode={authModal} onClose={()=>setAuthModal(null)} onAuth={u=>{setUser(u);setAuthModal(null);loadRole(u?.id??null);}}/>}
+    {authModal&&<AuthModal mode={typeof authModal==='object'?authModal.mode:authModal} hint={typeof authModal==='object'?authModal.hint:null} onClose={()=>setAuthModal(null)} onAuth={u=>{setUser(u);setAuthModal(null);loadRole(u?.id??null);}}/>}
   </div>;
 }
 
