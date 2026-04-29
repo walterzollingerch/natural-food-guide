@@ -1176,7 +1176,7 @@ function MerklistePage({listings,saved,onSave,onOpen,user,onAuth,onLike,likeCoun
 
 // ── Mehr page ──────────────────────────────────────────────────
 function MehrPage({events,magazine,onTrack}) {
-  const {t}=useLang();
+  const {t,locale}=useLang();
   const upcoming=[...events].sort((a,b)=>a.date_start<b.date_start?-1:1);
   const mags=[...magazine].sort((a,b)=>(a.sort_order??0)-(b.sort_order??0));
   return <div className="nfg-page">
@@ -1219,13 +1219,15 @@ function MehrPage({events,magazine,onTrack}) {
           <div className="nfg-mag">
             {mags.map(m=>{
               const href=m.doc_url||m.link;
+              const magTitle=locale==='EN'&&m.title_en?m.title_en:m.title;
+              const magShort=locale==='EN'&&m.short_en?m.short_en:m.short;
               return <article key={m.id} className="nfg-mag-card">
                 {m.image_url
-                  ?<img className="nfg-mag-img" src={m.image_url} alt={m.title}/>
+                  ?<img className="nfg-mag-img" src={m.image_url} alt={magTitle}/>
                   :<div className="nfg-mag-ph"><Ph kind="clay" tall/></div>}
                 <div className="nfg-mag-body">
-                  <h4>{m.title}</h4>
-                  {m.short&&<p className="nfg-mag-short">{m.short}</p>}
+                  <h4>{magTitle}</h4>
+                  {magShort&&<p className="nfg-mag-short">{magShort}</p>}
                   {href&&<div className="nfg-mag-footer">
                     <a className="nfg-mag-cta" href={href} target="_blank" rel="noopener noreferrer"
                        onClick={e=>{e.preventDefault();onTrack('magazine_click',m.id);window.open(href,'_blank','noopener,noreferrer');}}>
@@ -1241,17 +1243,21 @@ function MehrPage({events,magazine,onTrack}) {
         <h3 className="nfg-more-h">{t('mehr.events_title','Eventkalender')}</h3>
         {upcoming.length===0?<p style={{color:'#666',fontSize:14}}>{t('mehr.no_events','Keine Events erfasst.')}</p>:
           <ul className="nfg-events">
-            {upcoming.map(ev=><li key={ev.id}>
+            {upcoming.map(ev=>{
+              const evTitle=locale==='EN'&&ev.title_en?ev.title_en:ev.title;
+              const evShort=locale==='EN'&&ev.short_en?ev.short_en:ev.short;
+              return <li key={ev.id}>
               {ev.image_url
-                ?<img className="nfg-event-img" src={ev.image_url} alt={ev.title}/>
+                ?<img className="nfg-event-img" src={ev.image_url} alt={evTitle}/>
                 :<div className="nfg-event-ph"><Ph kind="sage"/></div>}
               <div>
                 <div className="nfg-event-date">{fmtEventDate(ev.date_start,ev.date_end,ev.time_start,ev.time_end)}</div>
-                <b>{ev.title}</b>
-                {ev.short&&<span>{ev.short}</span>}
+                <b>{evTitle}</b>
+                {evShort&&<span>{evShort}</span>}
               </div>
               {ev.link?<a className="nfg-link" href={ev.link} target="_blank" rel="noopener noreferrer" onClick={()=>onTrack('event_click',ev.id)}>→</a>:<span/>}
-            </li>)}
+            </li>;})}
+
           </ul>}
       </section>
     </div>
@@ -1434,11 +1440,13 @@ function ListingFormModal({initial,onClose,onSave}) {
 }
 
 // ── Event form modal ───────────────────────────────────────────
-const EMPTY_EVENT={title:'',short:'',date_start:'',date_end:'',link:'',image_url:'',time_start:'',time_end:''};
+const EMPTY_EVENT={title:'',title_en:'',short:'',short_en:'',date_start:'',date_end:'',link:'',image_url:'',time_start:'',time_end:''};
 
 function EventFormModal({initial,onClose,onSave}) {
+  const [formLang,setFormLang]=useState('DE');
   const [f,setF]=useState(()=>initial?{
-    title:initial.title||'',short:initial.short||'',
+    title:initial.title||'',title_en:initial.title_en||'',
+    short:initial.short||'',short_en:initial.short_en||'',
     date_start:initial.date_start||'',date_end:initial.date_end||'',
     link:initial.link||'',image_url:initial.image_url||'',
     time_start:initial.time_start?initial.time_start.slice(0,5):'',
@@ -1469,7 +1477,7 @@ function EventFormModal({initial,onClose,onSave}) {
     if(!f.date_start){setErr('Startdatum ist erforderlich.');return;}
     setSaving(true);
     const singleDay=!f.date_end;
-    const payload={title:f.title.trim(),short:f.short.trim(),date_start:f.date_start,date_end:f.date_end||null,link:f.link.trim()||null,image_url:f.image_url||null,time_start:singleDay&&f.time_start?f.time_start:null,time_end:singleDay&&f.time_end?f.time_end:null};
+    const payload={title:f.title.trim(),title_en:f.title_en.trim()||null,short:f.short.trim(),short_en:f.short_en.trim()||null,date_start:f.date_start,date_end:f.date_end||null,link:f.link.trim()||null,image_url:f.image_url||null,time_start:singleDay&&f.time_start?f.time_start:null,time_end:singleDay&&f.time_end?f.time_end:null};
     if(initial?.id) payload.id=initial.id;
     const errMsg=await onSave(payload,!!initial);
     setSaving(false);
@@ -1485,7 +1493,16 @@ function EventFormModal({initial,onClose,onSave}) {
       <button className="nfg-form-close" onClick={onClose}>×</button>
       <h2 className="nfg-form-title">{initial?'Event bearbeiten':'Neues Event'}</h2>
       <form onSubmit={submit}>
-        <div className="nfg-form-row one"><label className="nfg-label">Titel *<input {...inp} value={f.title} onChange={e=>set('title',e.target.value)} required placeholder="z.B. Bodenfest 2026"/></label></div>
+        <div style={{display:'flex',gap:6,marginBottom:20,background:'#f0f0f0',borderRadius:10,padding:3,width:'fit-content'}}>
+          {['DE','EN'].map(l=><button key={l} type="button" onClick={()=>setFormLang(l)} style={{border:'none',borderRadius:8,padding:'6px 18px',fontFamily:'inherit',fontSize:13,fontWeight:700,cursor:'pointer',background:formLang===l?'#000':'transparent',color:formLang===l?'#fff':'#666'}}>{l}</button>)}
+        </div>
+        {formLang==='DE'?<>
+          <div className="nfg-form-row one"><label className="nfg-label">Titel (DE) *<input {...inp} value={f.title} onChange={e=>set('title',e.target.value)} required placeholder="z.B. Bodenfest 2026"/></label></div>
+          <div className="nfg-form-row one"><label className="nfg-label">Kurzbeschreibung (DE)<textarea className="nfg-textarea" rows={3} value={f.short} onChange={e=>set('short',e.target.value)} placeholder="Kurze Beschreibung des Events…"/></label></div>
+        </>:<>
+          <div className="nfg-form-row one"><label className="nfg-label">Titel (EN)<small style={{fontWeight:400,color:'#888',marginLeft:6}}>Leer = DE wird angezeigt</small><input {...inp} value={f.title_en} onChange={e=>set('title_en',e.target.value)} placeholder="e.g. Soil Festival 2026"/></label></div>
+          <div className="nfg-form-row one"><label className="nfg-label">Short description (EN)<small style={{fontWeight:400,color:'#888',marginLeft:6}}>Leer = DE wird angezeigt</small><textarea className="nfg-textarea" rows={3} value={f.short_en} onChange={e=>set('short_en',e.target.value)} placeholder="Short description of the event…"/></label></div>
+        </>}
         <div className="nfg-form-section-h">Datum</div>
         <div className="nfg-form-row">
           <label className="nfg-label">Datum von *<input {...inp} type="date" value={f.date_start} onChange={e=>set('date_start',e.target.value)} required/></label>
@@ -1494,8 +1511,7 @@ function EventFormModal({initial,onClose,onSave}) {
         {!f.date_end&&<div className="nfg-form-row">
           <label className="nfg-label">Uhrzeit von<input {...inp} type="time" value={f.time_start} onChange={e=>set('time_start',e.target.value)}/></label>
           <label className="nfg-label">Uhrzeit bis<input {...inp} type="time" value={f.time_end} onChange={e=>set('time_end',e.target.value)}/></label>
-        </div>}
-        <div className="nfg-form-row one"><label className="nfg-label">Kurzbeschreibung<textarea className="nfg-textarea" rows={3} value={f.short} onChange={e=>set('short',e.target.value)} placeholder="Kurze Beschreibung des Events…"/></label></div>
+        </div>
         <div className="nfg-form-row one"><label className="nfg-label">Link zum Event<input {...inp} type="url" value={f.link} onChange={e=>set('link',e.target.value)} placeholder="https://event-website.ch"/></label></div>
         <div className="nfg-form-section-h">Bild</div>
         <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={onFileChange}/>
@@ -1737,11 +1753,14 @@ function UserTab({currentUserId}) {
 }
 
 // ── Magazine form modal ────────────────────────────────────────
-const EMPTY_MAG={title:'',short:'',image_url:'',linkType:'link',link:'',doc_url:''};
+const EMPTY_MAG={title:'',title_en:'',short:'',short_en:'',image_url:'',linkType:'link',link:'',doc_url:''};
 
 function MagazineFormModal({initial,onClose,onSave}) {
+  const [formLang,setFormLang]=useState('DE');
   const [f,setF]=useState(()=>initial?{
-    title:initial.title||'',short:initial.short||'',image_url:initial.image_url||'',
+    title:initial.title||'',title_en:initial.title_en||'',
+    short:initial.short||'',short_en:initial.short_en||'',
+    image_url:initial.image_url||'',
     linkType:initial.doc_url?'doc':'link',link:initial.link||'',doc_url:initial.doc_url||''
   }:{...EMPTY_MAG});
   const [err,setErr]=useState('');
@@ -1780,7 +1799,7 @@ function MagazineFormModal({initial,onClose,onSave}) {
     e.preventDefault(); setErr('');
     if(!f.title.trim()){setErr('Titel ist erforderlich.');return;}
     setSaving(true);
-    const payload={title:f.title.trim(),short:f.short.trim(),image_url:f.image_url||null,
+    const payload={title:f.title.trim(),title_en:f.title_en.trim()||null,short:f.short.trim(),short_en:f.short_en.trim()||null,image_url:f.image_url||null,
       link:f.linkType==='link'?f.link.trim()||null:null,
       doc_url:f.linkType==='doc'?f.doc_url||null:null};
     if(initial?.id) payload.id=initial.id;
@@ -1796,8 +1815,16 @@ function MagazineFormModal({initial,onClose,onSave}) {
       <button className="nfg-form-close" onClick={onClose}>×</button>
       <h2 className="nfg-form-title">{initial?'Beitrag bearbeiten':'Neuer Beitrag'}</h2>
       <form onSubmit={submit}>
-        <div className="nfg-form-row one"><label className="nfg-label">Titel *<input {...inp} value={f.title} onChange={e=>set('title',e.target.value)} required placeholder="z.B. Portrait: Andreas Caminada"/></label></div>
-        <div className="nfg-form-row one"><label className="nfg-label">Kurzbeschreibung<textarea className="nfg-textarea" rows={3} value={f.short} onChange={e=>set('short',e.target.value)} placeholder="Kurze Beschreibung des Beitrags…"/></label></div>
+        <div style={{display:'flex',gap:6,marginBottom:20,background:'#f0f0f0',borderRadius:10,padding:3,width:'fit-content'}}>
+          {['DE','EN'].map(l=><button key={l} type="button" onClick={()=>setFormLang(l)} style={{border:'none',borderRadius:8,padding:'6px 18px',fontFamily:'inherit',fontSize:13,fontWeight:700,cursor:'pointer',background:formLang===l?'#000':'transparent',color:formLang===l?'#fff':'#666'}}>{l}</button>)}
+        </div>
+        {formLang==='DE'?<>
+          <div className="nfg-form-row one"><label className="nfg-label">Titel (DE) *<input {...inp} value={f.title} onChange={e=>set('title',e.target.value)} required placeholder="z.B. Portrait: Andreas Caminada"/></label></div>
+          <div className="nfg-form-row one"><label className="nfg-label">Kurzbeschreibung (DE)<textarea className="nfg-textarea" rows={3} value={f.short} onChange={e=>set('short',e.target.value)} placeholder="Kurze Beschreibung des Beitrags…"/></label></div>
+        </>:<>
+          <div className="nfg-form-row one"><label className="nfg-label">Titel (EN)<small style={{fontWeight:400,color:'#888',marginLeft:6}}>Leer = DE wird angezeigt</small><input {...inp} value={f.title_en} onChange={e=>set('title_en',e.target.value)} placeholder="e.g. Portrait: Andreas Caminada"/></label></div>
+          <div className="nfg-form-row one"><label className="nfg-label">Short description (EN)<small style={{fontWeight:400,color:'#888',marginLeft:6}}>Leer = DE wird angezeigt</small><textarea className="nfg-textarea" rows={3} value={f.short_en} onChange={e=>set('short_en',e.target.value)} placeholder="Short description of the article…"/></label></div>
+        </>}
 
         <div className="nfg-form-section-h">Bild</div>
         <input ref={imgRef} type="file" accept="image/*" style={{display:'none'}} onChange={onImgChange}/>
