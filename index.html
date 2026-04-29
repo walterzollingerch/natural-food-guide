@@ -2612,8 +2612,9 @@ function App() {
 
   const loadRole=useCallback(async uid=>{
     if(!uid){setUserRole(null);return;}
-    const {data}=await db.from('user_profiles').select('role').eq('id',uid).single();
-    setUserRole(data?.role||'user');
+    const {data,error}=await db.from('user_profiles').select('role').eq('id',uid).limit(1);
+    if(error||!data||data.length===0){setUserRole('user');return;}
+    setUserRole(data[0].role||'user');
   },[]);
 
   useEffect(()=>{
