@@ -159,6 +159,21 @@ body { background: var(--nfg-bg); font-family: var(--nfg-sans); color: var(--nfg
 .nfg-rubric-meta { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; font-weight: 600; }
 .nfg-rubric-meta span { font-size: 11px; color: #666; font-weight: 500; }
 .nfg-rubric ul { margin: 0; padding: 0 0 0 16px; font-size: 13px; color: #666; }
+.nfg-pts-legend { display: flex; flex-direction: column; gap: 4px; margin: 12px 0 20px; background: #f8f8f8; border-radius: 10px; padding: 12px 14px; }
+.nfg-pts-legend-row { display: flex; gap: 10px; font-size: 13px; color: #444; line-height: 1.4; }
+.nfg-pts-legend-row b { flex-shrink: 0; }
+.nfg-kriterien-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 4px; }
+.nfg-kriterien-cat-h { font-size: 13px; font-weight: 700; color: #000; margin: 0 0 10px; padding-bottom: 8px; border-bottom: 2px solid #000; }
+.nfg-kriterien-list { list-style: none; padding: 0; margin: 0; }
+.nfg-kriterien-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--nfg-line); font-size: 13px; color: #333; line-height: 1.4; }
+.nfg-kriterien-item:last-child { border-bottom: 0; }
+.nfg-kriterien-pts { background: var(--nfg-accent); color: #000; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 2px 8px; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+.nfg-bonus-list { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 5px; }
+.nfg-bonus-list li { font-size: 13px; color: #444; padding-left: 16px; position: relative; }
+.nfg-bonus-list li::before { content: '•'; position: absolute; left: 0; color: #000; font-weight: 700; }
+.nfg-kriterien-note { margin-top: 20px; background: #f8f8f8; border-radius: 10px; padding: 12px 14px; font-size: 13px; color: #555; line-height: 1.5; }
+.nfg-kriterien-note b { color: #000; display: block; margin-bottom: 3px; }
+@media (max-width: 640px) { .nfg-kriterien-grid { grid-template-columns: 1fr; } }
 .nfg-mag { display: flex; flex-direction: column; gap: 10px; }
 .nfg-mag-card { display: flex; gap: 12px; background: var(--nfg-bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--nfg-line); }
 .nfg-mag-card > div:first-child { width: 100px; height: 80px; flex-shrink: 0; }
@@ -880,7 +895,36 @@ function MehrPage({events}) {
     <h2 className="nfg-page-h">Mehr</h2>
     <div className="nfg-mehr-grid">
       <section className="nfg-more-card full"><h3 className="nfg-more-h">Was ist der Natural Food Guide?</h3><p>Ein kuratierter Guide für Restaurants, Verarbeiter:innen, Höfe, Läden sowie Pop-Ups & Events in der Schweiz, die mit Boden, Saison und Herkunft konsequent umgehen.</p><a href="#" className="nfg-link">Über uns →</a></section>
-      <section className="nfg-more-card" id="kriterien"><h3 className="nfg-more-h">Bewertungsraster</h3><div className="nfg-rubric">{[{c:'Boden & Anbau',w:25,items:['Regenerative Praxis','Bio-/Demeter-Zertifikate','Bodenfruchtbarkeit']},{c:'Herkunft & Kreislauf',w:25,items:['Direktbezug','Lieferantenliste','Ganztiernutzung']},{c:'Saison & Karte',w:20,items:['Wechselnde Karte','Saisonale Zutaten']},{c:'Pflanzenanteil',w:15,items:['Reduzierter Tieranteil','Pflanzliche Tiefe']},{c:'Transparenz',w:15,items:['Offene Kommunikation','Rückverfolgbarkeit']}].map(r=><div key={r.c} className="nfg-rubric-row"><div className="nfg-rubric-bar"><span style={{width:r.w+'%'}}/></div><div className="nfg-rubric-meta"><b>{r.c}</b><span>{r.w}%</span></div><ul>{r.items.map(i=><li key={i}>{i}</li>)}</ul></div>)}</div></section>
+      <section className="nfg-more-card full" id="kriterien">
+        <h3 className="nfg-more-h">Bewertungskriterien</h3>
+        <p>Restaurants im Natural Food Guide werden nach einem transparenten Kriterienkatalog bewertet. Die Bewertung erfolgt in den Kategorien «Küche» und «Restaurant &amp; Betrieb».</p>
+        <div className="nfg-pts-legend">
+          <div className="nfg-pts-legend-row"><b>3 Punkte:</b><span>wird grösstenteils eingehalten</span></div>
+          <div className="nfg-pts-legend-row"><b>2 Punkte:</b><span>wird mehrheitlich eingehalten, bis auf wenige Ausnahmen</span></div>
+          <div className="nfg-pts-legend-row"><b>1 Punkt:</b><span>wird nur wenig darauf geachtet</span></div>
+        </div>
+        <div className="nfg-kriterien-grid">
+          <div>
+            <div className="nfg-kriterien-cat-h">Küche</div>
+            <ul className="nfg-kriterien-list">
+              {[['Verwendung saisonaler und regionaler Produkte',1],['Verwendung von frischen und gering verarbeiteten Lebensmitteln',2],['Hoher Anteil Produkte aus regenerativer Landwirtschaft oder Bio-Produktion',1],['Enge und persönliche Bindung zu Produzent:innen',1],['Foodwaste wird auf ein Minimum reduziert',2],['Komplette Verwertung von Lebensmitteln (auch bei Tieren)',2],['Wird auf fair gehandelte Produkte (Tee, Kaffee, Schokolade…) Wert gelegt',2],['Fokus Gemüse; es gibt mehr vegetarische Gerichte als Fleischgerichte',1]].map(([n,p])=><li key={n} className="nfg-kriterien-item"><span>{n}</span><span className="nfg-kriterien-pts">max. {p}</span></li>)}
+            </ul>
+          </div>
+          <div>
+            <div className="nfg-kriterien-cat-h">Restaurant &amp; Betrieb</div>
+            <ul className="nfg-kriterien-list">
+              {[['Kommunikation gegenüber den Gästen; Nachhaltigkeit wird ehrlich kommuniziert',1],['Bezugsquellen und Produzent:innen werden offen genannt',1],['Kleinere Portionengrössen, um Foodwaste zu vermeiden',2],['Kooperationen mit Vereinen (Tischlein deck dich, Too good to go, etc.)',3],['Faires Arbeitsklima und Entlöhnungssystem',2],['Nachhaltige Betriebsführung; Förderung der Mitarbeitenden, Weiterbildungen',2]].map(([n,p])=><li key={n} className="nfg-kriterien-item"><span>{n}</span><span className="nfg-kriterien-pts">max. {p}</span></li>)}
+            </ul>
+            <div className="nfg-kriterien-cat-h" style={{marginTop:22}}>Bonuspunkte</div>
+            <ul className="nfg-bonus-list">
+              <li>Eigener Garten mit Gemüse, Obst und/oder Kräuter</li>
+              <li>Workshops zum Thema Nachhaltigkeit</li>
+              <li>Zertifizierungen im Bereich Nachhaltigkeit</li>
+            </ul>
+          </div>
+        </div>
+        <div className="nfg-kriterien-note"><b>Transparenz</b>Alle Bewertungen basieren auf direkten Gesprächen mit den Restaurants und werden regelmässig aktualisiert. Die Kriterien sind öffentlich einsehbar und nachvollziehbar.</div>
+      </section>
       <section className="nfg-more-card"><h3 className="nfg-more-h">Magazin</h3><div className="nfg-mag">{[{t:'Portrait: Andreas Caminada',k:'Portrait',kind:'forest'},{t:'Editorial: Was heisst regenerativ wirklich?',k:'Editorial',kind:'sage'},{t:'Partner: Soil to Soul Symposium 2026',k:'Partner',kind:'clay'}].map(m=><article key={m.t} className="nfg-mag-card"><div><Ph kind={m.kind} label={m.k}/></div><div><span className="nfg-mag-kind">{m.k}</span><h4>{m.t}</h4></div></article>)}</div></section>
       <section className="nfg-more-card">
         <h3 className="nfg-more-h">Eventkalender</h3>
