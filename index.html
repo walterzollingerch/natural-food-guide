@@ -1511,7 +1511,7 @@ function EventFormModal({initial,onClose,onSave}) {
         {!f.date_end&&<div className="nfg-form-row">
           <label className="nfg-label">Uhrzeit von<input {...inp} type="time" value={f.time_start} onChange={e=>set('time_start',e.target.value)}/></label>
           <label className="nfg-label">Uhrzeit bis<input {...inp} type="time" value={f.time_end} onChange={e=>set('time_end',e.target.value)}/></label>
-        </div>
+        </div>}
         <div className="nfg-form-row one"><label className="nfg-label">Link zum Event<input {...inp} type="url" value={f.link} onChange={e=>set('link',e.target.value)} placeholder="https://event-website.ch"/></label></div>
         <div className="nfg-form-section-h">Bild</div>
         <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={onFileChange}/>
