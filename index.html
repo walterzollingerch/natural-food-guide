@@ -426,15 +426,22 @@ const fmtDate   = d  => new Date(d).toLocaleDateString('de-CH',{day:'2-digit',mo
 const userName  = u  => u?.user_metadata?.name || u?.email?.split('@')[0] || 'Anonym';
 const userInit  = u  => (userName(u)).charAt(0).toUpperCase();
 const EVT_M     = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
-const fmtEventDate = (s,e) => {
+const fmtEventDate = (s,e,ts,te) => {
   if(!s) return '—';
   const d1=new Date(s+'T12:00:00'), d2=e&&e!==s?new Date(e+'T12:00:00'):null;
-  if(!d2) return `${d1.getDate()}. ${EVT_M[d1.getMonth()]} ${d1.getFullYear()}`;
-  if(d1.getFullYear()===d2.getFullYear()){
-    if(d1.getMonth()===d2.getMonth()) return `${d1.getDate()}.–${d2.getDate()}. ${EVT_M[d1.getMonth()]} ${d1.getFullYear()}`;
-    return `${d1.getDate()}. ${EVT_M[d1.getMonth()]} – ${d2.getDate()}. ${EVT_M[d2.getMonth()]} ${d1.getFullYear()}`;
+  if(d2){
+    if(d1.getFullYear()===d2.getFullYear()){
+      if(d1.getMonth()===d2.getMonth()) return `${d1.getDate()}.–${d2.getDate()}. ${EVT_M[d1.getMonth()]} ${d1.getFullYear()}`;
+      return `${d1.getDate()}. ${EVT_M[d1.getMonth()]} – ${d2.getDate()}. ${EVT_M[d2.getMonth()]} ${d1.getFullYear()}`;
+    }
+    return `${d1.getDate()}. ${EVT_M[d1.getMonth()]} ${d1.getFullYear()} – ${d2.getDate()}. ${EVT_M[d2.getMonth()]} ${d2.getFullYear()}`;
   }
-  return `${d1.getDate()}. ${EVT_M[d1.getMonth()]} ${d1.getFullYear()} – ${d2.getDate()}. ${EVT_M[d2.getMonth()]} ${d2.getFullYear()}`;
+  const ds=`${d1.getDate()}. ${EVT_M[d1.getMonth()]} ${d1.getFullYear()}`;
+  const t1=ts?ts.slice(0,5):null, t2=te?te.slice(0,5):null;
+  if(t1&&t2) return `${ds}, ${t1}–${t2} Uhr`;
+  if(t1) return `${ds}, ab ${t1} Uhr`;
+  if(t2) return `${ds}, bis ${t2} Uhr`;
+  return ds;
 };
 
 // ── Placeholder image ──────────────────────────────────────────
@@ -884,7 +891,7 @@ function MehrPage({events}) {
                 ?<img className="nfg-event-img" src={ev.image_url} alt={ev.title}/>
                 :<div className="nfg-event-ph"><Ph kind="sage"/></div>}
               <div>
-                <div className="nfg-event-date">{fmtEventDate(ev.date_start,ev.date_end)}</div>
+                <div className="nfg-event-date">{fmtEventDate(ev.date_start,ev.date_end,ev.time_start,ev.time_end)}</div>
                 <b>{ev.title}</b>
                 {ev.short&&<span>{ev.short}</span>}
               </div>
@@ -1051,13 +1058,15 @@ function ListingFormModal({initial,onClose,onSave}) {
 }
 
 // ── Event form modal ───────────────────────────────────────────
-const EMPTY_EVENT={title:'',short:'',date_start:'',date_end:'',link:'',image_url:''};
+const EMPTY_EVENT={title:'',short:'',date_start:'',date_end:'',link:'',image_url:'',time_start:'',time_end:''};
 
 function EventFormModal({initial,onClose,onSave}) {
   const [f,setF]=useState(()=>initial?{
     title:initial.title||'',short:initial.short||'',
     date_start:initial.date_start||'',date_end:initial.date_end||'',
-    link:initial.link||'',image_url:initial.image_url||''
+    link:initial.link||'',image_url:initial.image_url||'',
+    time_start:initial.time_start?initial.time_start.slice(0,5):'',
+    time_end:initial.time_end?initial.time_end.slice(0,5):''
   }:{...EMPTY_EVENT});
   const [err,setErr]=useState('');
   const [saving,setSaving]=useState(false);
@@ -1083,7 +1092,8 @@ function EventFormModal({initial,onClose,onSave}) {
     if(!f.title.trim()){setErr('Titel ist erforderlich.');return;}
     if(!f.date_start){setErr('Startdatum ist erforderlich.');return;}
     setSaving(true);
-    const payload={title:f.title.trim(),short:f.short.trim(),date_start:f.date_start,date_end:f.date_end||null,link:f.link.trim()||null,image_url:f.image_url||null};
+    const singleDay=!f.date_end;
+    const payload={title:f.title.trim(),short:f.short.trim(),date_start:f.date_start,date_end:f.date_end||null,link:f.link.trim()||null,image_url:f.image_url||null,time_start:singleDay&&f.time_start?f.time_start:null,time_end:singleDay&&f.time_end?f.time_end:null};
     if(initial?.id) payload.id=initial.id;
     const errMsg=await onSave(payload,!!initial);
     setSaving(false);
@@ -1102,9 +1112,13 @@ function EventFormModal({initial,onClose,onSave}) {
         <div className="nfg-form-row one"><label className="nfg-label">Titel *<input {...inp} value={f.title} onChange={e=>set('title',e.target.value)} required placeholder="z.B. Bodenfest 2026"/></label></div>
         <div className="nfg-form-section-h">Datum</div>
         <div className="nfg-form-row">
-          <label className="nfg-label">Von *<input {...inp} type="date" value={f.date_start} onChange={e=>set('date_start',e.target.value)} required/></label>
-          <label className="nfg-label">Bis <small style={{fontWeight:400,color:'#888'}}>(leer = eintägig)</small><input {...inp} type="date" value={f.date_end} onChange={e=>set('date_end',e.target.value)}/></label>
+          <label className="nfg-label">Datum von *<input {...inp} type="date" value={f.date_start} onChange={e=>set('date_start',e.target.value)} required/></label>
+          <label className="nfg-label">Datum bis <small style={{fontWeight:400,color:'#888'}}>(leer = eintägig)</small><input {...inp} type="date" value={f.date_end} onChange={e=>set('date_end',e.target.value)}/></label>
         </div>
+        {!f.date_end&&<div className="nfg-form-row">
+          <label className="nfg-label">Uhrzeit von<input {...inp} type="time" value={f.time_start} onChange={e=>set('time_start',e.target.value)}/></label>
+          <label className="nfg-label">Uhrzeit bis<input {...inp} type="time" value={f.time_end} onChange={e=>set('time_end',e.target.value)}/></label>
+        </div>}
         <div className="nfg-form-row one"><label className="nfg-label">Kurzbeschreibung<textarea className="nfg-textarea" rows={3} value={f.short} onChange={e=>set('short',e.target.value)} placeholder="Kurze Beschreibung des Events…"/></label></div>
         <div className="nfg-form-row one"><label className="nfg-label">Link zum Event<input {...inp} type="url" value={f.link} onChange={e=>set('link',e.target.value)} placeholder="https://event-website.ch"/></label></div>
         <div className="nfg-form-section-h">Bild</div>
@@ -1168,7 +1182,7 @@ function EventsTab({events,setEvents}) {
           :<div className="nfg-admin-dot" style={{background:'#8b5cf6'}}/>}
         <div className="nfg-admin-info">
           <div className="nfg-admin-name">{ev.title}</div>
-          <div className="nfg-admin-meta">{fmtEventDate(ev.date_start,ev.date_end)}{ev.short?` · ${ev.short.slice(0,70)}${ev.short.length>70?'…':''}`:''}</div>
+          <div className="nfg-admin-meta">{fmtEventDate(ev.date_start,ev.date_end,ev.time_start,ev.time_end)}{ev.short?` · ${ev.short.slice(0,70)}${ev.short.length>70?'…':''}`:''}</div>
         </div>
         <div className="nfg-admin-actions">
           <button className="nfg-btn-sm nfg-btn-sm-edit" onClick={()=>setFormItem(ev)}>Bearbeiten</button>
