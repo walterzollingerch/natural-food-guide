@@ -386,10 +386,25 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
--- Supabase Storage Bucket für Bilder
+-- Supabase Storage Bucket für Bilder und Dokumente
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES ('unternehmen', 'unternehmen', true, 5242880, ARRAY['image/jpeg','image/png','image/webp'])
-ON CONFLICT (id) DO NOTHING;
+VALUES ('unternehmen', 'unternehmen', true, 20971520,
+  ARRAY['image/jpeg','image/png','image/webp','application/pdf',
+        'application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/vnd.apple.keynote','application/vnd.apple.pages'])
+ON CONFLICT (id) DO UPDATE SET
+  allowed_mime_types = EXCLUDED.allowed_mime_types,
+  file_size_limit    = EXCLUDED.file_size_limit;
+
+-- Falls der Bucket bereits existiert und nur Bilder erlaubt: Dokument-Typen nachträglich ergänzen
+-- UPDATE storage.buckets
+-- SET allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp','application/pdf',
+--       'application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+--       'application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation',
+--       'application/vnd.apple.keynote','application/vnd.apple.pages'],
+--     file_size_limit = 20971520
+-- WHERE id = 'unternehmen';
 
 CREATE POLICY "Public lesen"     ON storage.objects FOR SELECT USING (bucket_id = 'unternehmen');
 CREATE POLICY "Auth hochladen"   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'unternehmen' AND auth.uid() IS NOT NULL);
@@ -953,7 +968,8 @@ function MehrPage({events,magazine}) {
                   <h4>{m.title}</h4>
                   {m.short&&<p className="nfg-mag-short">{m.short}</p>}
                   {href&&<div className="nfg-mag-footer">
-                    <a className="nfg-mag-cta" href={href} target="_blank" rel="noopener noreferrer">
+                    <a className="nfg-mag-cta" href={href} target="_blank" rel="noopener noreferrer"
+                       onClick={e=>{e.preventDefault();window.open(href,'_blank','noopener,noreferrer');}}>
                       {m.doc_url?'↓ Dokument':'→ Lesen'}
                     </a>
                   </div>}
@@ -1454,23 +1470,28 @@ function MagazineFormModal({initial,onClose,onSave}) {
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
 
   const uploadFile=async(file,bucket,path,onDone)=>{
-    const{error}=await db.storage.from(bucket).upload(path,file,{upsert:true,contentType:file.type});
-    if(!error){const{data:{publicUrl}}=db.storage.from(bucket).getPublicUrl(path);onDone(publicUrl);}
+    const{error}=await db.storage.from(bucket).upload(path,file,{upsert:true,contentType:file.type||'application/octet-stream'});
+    if(error) return error.message;
+    const{data:{publicUrl}}=db.storage.from(bucket).getPublicUrl(path);
+    onDone(publicUrl);
+    return null;
   };
 
   const onImgChange=async e=>{
     const file=e.target.files[0]; if(!file) return;
     setImgUpl(true);
     const ext=file.name.split('.').pop().toLowerCase();
-    await uploadFile(file,'unternehmen',`magazine/${initial?.id||'new'}_img_${Date.now()}.${ext}`,url=>set('image_url',url));
+    const errMsg=await uploadFile(file,'unternehmen',`magazine/${initial?.id||'new'}_img_${Date.now()}.${ext}`,url=>set('image_url',url));
     setImgUpl(false); e.target.value='';
+    if(errMsg) setErr('Bild-Upload fehlgeschlagen: '+errMsg);
   };
   const onDocChange=async e=>{
     const file=e.target.files[0]; if(!file) return;
     setDocUpl(true);
     const ext=file.name.split('.').pop().toLowerCase();
-    await uploadFile(file,'unternehmen',`magazine/docs/${initial?.id||'new'}_${Date.now()}.${ext}`,url=>set('doc_url',url));
+    const errMsg=await uploadFile(file,'unternehmen',`magazine/docs/${initial?.id||'new'}_${Date.now()}.${ext}`,url=>set('doc_url',url));
     setDocUpl(false); e.target.value='';
+    if(errMsg) setErr('Dokument-Upload fehlgeschlagen: '+errMsg);
   };
 
   const submit=async e=>{
