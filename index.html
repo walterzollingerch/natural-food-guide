@@ -165,12 +165,14 @@ body { background: var(--nfg-bg); font-family: var(--nfg-sans); color: var(--nfg
 .nfg-mag-card > div:last-child { padding: 12px 14px 12px 0; }
 .nfg-mag-kind { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #000; background: var(--nfg-accent); display: inline-block; padding: 2px 7px; border-radius: 999px; }
 .nfg-mag-card h4 { font-weight: 700; margin: 6px 0 0; font-size: 14px; line-height: 1.25; color: #000; }
-.nfg-events { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
-.nfg-events li { display: grid; grid-template-columns: 90px 1fr 20px; gap: 12px; align-items: center; border-top: 1px solid var(--nfg-line); padding-top: 12px; }
+.nfg-events { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
+.nfg-events li { display: grid; grid-template-columns: 90px 1fr 20px; gap: 14px; align-items: center; border-top: 1px solid var(--nfg-line); padding-top: 14px; }
 .nfg-events li:first-child { border-top: 0; padding-top: 0; }
-.nfg-event-date { font-size: 11px; font-weight: 700; color: #000; background: var(--nfg-accent); padding: 3px 8px; border-radius: 6px; display: inline-block; }
-.nfg-events b { display: block; font-weight: 700; font-size: 15px; color: #000; }
-.nfg-events span { font-size: 12px; color: #666; }
+.nfg-event-date { font-size: 11px; font-weight: 700; color: #000; background: var(--nfg-accent); padding: 3px 8px; border-radius: 6px; display: inline-block; margin-bottom: 3px; }
+.nfg-events b { display: block; font-weight: 700; font-size: 15px; color: #000; line-height: 1.25; }
+.nfg-events span { font-size: 12px; color: #666; line-height: 1.4; display: block; margin-top: 2px; }
+.nfg-event-img { width: 90px; height: 64px; object-fit: cover; border-radius: 8px; flex-shrink: 0; display: block; }
+.nfg-event-ph { width: 90px; height: 64px; border-radius: 8px; flex-shrink: 0; position: relative; overflow: hidden; }
 .nfg-admin-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
 .nfg-admin-list { display: flex; flex-direction: column; gap: 8px; }
 .nfg-admin-item { background: #fff; border: 1px solid var(--nfg-line); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; transition: box-shadow 0.15s; }
@@ -423,6 +425,17 @@ const uid       = () => Math.random().toString(36).slice(2,10);
 const fmtDate   = d  => new Date(d).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit',year:'numeric'});
 const userName  = u  => u?.user_metadata?.name || u?.email?.split('@')[0] || 'Anonym';
 const userInit  = u  => (userName(u)).charAt(0).toUpperCase();
+const EVT_M     = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+const fmtEventDate = (s,e) => {
+  if(!s) return '—';
+  const d1=new Date(s+'T12:00:00'), d2=e&&e!==s?new Date(e+'T12:00:00'):null;
+  if(!d2) return `${d1.getDate()}. ${EVT_M[d1.getMonth()]} ${d1.getFullYear()}`;
+  if(d1.getFullYear()===d2.getFullYear()){
+    if(d1.getMonth()===d2.getMonth()) return `${d1.getDate()}.–${d2.getDate()}. ${EVT_M[d1.getMonth()]} ${d1.getFullYear()}`;
+    return `${d1.getDate()}. ${EVT_M[d1.getMonth()]} – ${d2.getDate()}. ${EVT_M[d2.getMonth()]} ${d1.getFullYear()}`;
+  }
+  return `${d1.getDate()}. ${EVT_M[d1.getMonth()]} ${d1.getFullYear()} – ${d2.getDate()}. ${EVT_M[d2.getMonth()]} ${d2.getFullYear()}`;
+};
 
 // ── Placeholder image ──────────────────────────────────────────
 function Ph({kind='forest',label,tall}) {
@@ -854,15 +867,31 @@ function MerklistePage({listings,saved,onSave,onOpen,user,onAuth}) {
 }
 
 // ── Mehr page ──────────────────────────────────────────────────
-function MehrPage({listings}) {
-  const events=listings.filter(x=>x.type==='Event');
+function MehrPage({events}) {
+  const upcoming=[...events].sort((a,b)=>a.date_start<b.date_start?-1:1);
   return <div className="nfg-page">
     <h2 className="nfg-page-h">Mehr</h2>
     <div className="nfg-mehr-grid">
       <section className="nfg-more-card full"><h3 className="nfg-more-h">Was ist der Natural Food Guide?</h3><p>Ein kuratierter Guide für Restaurants, Verarbeiter:innen, Höfe, Läden sowie Pop-Ups & Events in der Schweiz, die mit Boden, Saison und Herkunft konsequent umgehen.</p><a href="#" className="nfg-link">Über uns →</a></section>
       <section className="nfg-more-card" id="kriterien"><h3 className="nfg-more-h">Bewertungsraster</h3><div className="nfg-rubric">{[{c:'Boden & Anbau',w:25,items:['Regenerative Praxis','Bio-/Demeter-Zertifikate','Bodenfruchtbarkeit']},{c:'Herkunft & Kreislauf',w:25,items:['Direktbezug','Lieferantenliste','Ganztiernutzung']},{c:'Saison & Karte',w:20,items:['Wechselnde Karte','Saisonale Zutaten']},{c:'Pflanzenanteil',w:15,items:['Reduzierter Tieranteil','Pflanzliche Tiefe']},{c:'Transparenz',w:15,items:['Offene Kommunikation','Rückverfolgbarkeit']}].map(r=><div key={r.c} className="nfg-rubric-row"><div className="nfg-rubric-bar"><span style={{width:r.w+'%'}}/></div><div className="nfg-rubric-meta"><b>{r.c}</b><span>{r.w}%</span></div><ul>{r.items.map(i=><li key={i}>{i}</li>)}</ul></div>)}</div></section>
       <section className="nfg-more-card"><h3 className="nfg-more-h">Magazin</h3><div className="nfg-mag">{[{t:'Portrait: Andreas Caminada',k:'Portrait',kind:'forest'},{t:'Editorial: Was heisst regenerativ wirklich?',k:'Editorial',kind:'sage'},{t:'Partner: Soil to Soul Symposium 2026',k:'Partner',kind:'clay'}].map(m=><article key={m.t} className="nfg-mag-card"><div><Ph kind={m.kind} label={m.k}/></div><div><span className="nfg-mag-kind">{m.k}</span><h4>{m.t}</h4></div></article>)}</div></section>
-      <section className="nfg-more-card"><h3 className="nfg-more-h">Eventkalender</h3>{events.length===0?<p>Keine Events erfasst.</p>:<ul className="nfg-events">{events.map(e=><li key={e.id}><div className="nfg-event-date">{e.date||'—'}</div><div><b>{e.name}</b><span>{e.city} · {e.short}</span></div><a className="nfg-link" href="#">→</a></li>)}</ul>}</section>
+      <section className="nfg-more-card">
+        <h3 className="nfg-more-h">Eventkalender</h3>
+        {upcoming.length===0?<p style={{color:'#666',fontSize:14}}>Keine Events erfasst.</p>:
+          <ul className="nfg-events">
+            {upcoming.map(ev=><li key={ev.id}>
+              {ev.image_url
+                ?<img className="nfg-event-img" src={ev.image_url} alt={ev.title}/>
+                :<div className="nfg-event-ph"><Ph kind="sage"/></div>}
+              <div>
+                <div className="nfg-event-date">{fmtEventDate(ev.date_start,ev.date_end)}</div>
+                <b>{ev.title}</b>
+                {ev.short&&<span>{ev.short}</span>}
+              </div>
+              {ev.link?<a className="nfg-link" href={ev.link} target="_blank" rel="noopener noreferrer">→</a>:<span/>}
+            </li>)}
+          </ul>}
+      </section>
     </div>
   </div>;
 }
@@ -1021,6 +1050,148 @@ function ListingFormModal({initial,onClose,onSave}) {
   </div>;
 }
 
+// ── Event form modal ───────────────────────────────────────────
+const EMPTY_EVENT={title:'',short:'',date_start:'',date_end:'',link:'',image_url:''};
+
+function EventFormModal({initial,onClose,onSave}) {
+  const [f,setF]=useState(()=>initial?{
+    title:initial.title||'',short:initial.short||'',
+    date_start:initial.date_start||'',date_end:initial.date_end||'',
+    link:initial.link||'',image_url:initial.image_url||''
+  }:{...EMPTY_EVENT});
+  const [err,setErr]=useState('');
+  const [saving,setSaving]=useState(false);
+  const [uploading,setUploading]=useState(false);
+  const fileRef=useRef();
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  const onFileChange=async e=>{
+    const file=e.target.files[0]; if(!file) return;
+    setUploading(true);
+    const ext=file.name.split('.').pop().toLowerCase();
+    const path=`events/${initial?.id||'new'}_${Date.now()}.${ext}`;
+    const{error}=await db.storage.from('unternehmen').upload(path,file,{upsert:true,contentType:file.type});
+    if(!error){
+      const{data:{publicUrl}}=db.storage.from('unternehmen').getPublicUrl(path);
+      set('image_url',publicUrl);
+    }
+    setUploading(false); e.target.value='';
+  };
+
+  const submit=async e=>{
+    e.preventDefault(); setErr('');
+    if(!f.title.trim()){setErr('Titel ist erforderlich.');return;}
+    if(!f.date_start){setErr('Startdatum ist erforderlich.');return;}
+    setSaving(true);
+    const payload={title:f.title.trim(),short:f.short.trim(),date_start:f.date_start,date_end:f.date_end||null,link:f.link.trim()||null,image_url:f.image_url||null};
+    if(initial?.id) payload.id=initial.id;
+    const errMsg=await onSave(payload,!!initial);
+    setSaving(false);
+    if(errMsg){setErr(errMsg);return;}
+    onClose();
+  };
+
+  const inp={className:'nfg-input'};
+  const pickFile=()=>fileRef.current.click();
+
+  return <div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&onClose()}>
+    <div className="nfg-form-sheet">
+      <button className="nfg-form-close" onClick={onClose}>×</button>
+      <h2 className="nfg-form-title">{initial?'Event bearbeiten':'Neues Event'}</h2>
+      <form onSubmit={submit}>
+        <div className="nfg-form-row one"><label className="nfg-label">Titel *<input {...inp} value={f.title} onChange={e=>set('title',e.target.value)} required placeholder="z.B. Bodenfest 2026"/></label></div>
+        <div className="nfg-form-section-h">Datum</div>
+        <div className="nfg-form-row">
+          <label className="nfg-label">Von *<input {...inp} type="date" value={f.date_start} onChange={e=>set('date_start',e.target.value)} required/></label>
+          <label className="nfg-label">Bis <small style={{fontWeight:400,color:'#888'}}>(leer = eintägig)</small><input {...inp} type="date" value={f.date_end} onChange={e=>set('date_end',e.target.value)}/></label>
+        </div>
+        <div className="nfg-form-row one"><label className="nfg-label">Kurzbeschreibung<textarea className="nfg-textarea" rows={3} value={f.short} onChange={e=>set('short',e.target.value)} placeholder="Kurze Beschreibung des Events…"/></label></div>
+        <div className="nfg-form-row one"><label className="nfg-label">Link zum Event<input {...inp} type="url" value={f.link} onChange={e=>set('link',e.target.value)} placeholder="https://event-website.ch"/></label></div>
+        <div className="nfg-form-section-h">Bild</div>
+        <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={onFileChange}/>
+        <div className={'nfg-img-slot'+(f.image_url?' has-img':'')} style={{height:180,width:'100%',marginBottom:16}} onClick={!f.image_url?pickFile:undefined}>
+          {f.image_url&&<img src={f.image_url} alt="Event" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
+          {f.image_url&&<button className="nfg-img-slot-rm" type="button" onClick={e=>{e.stopPropagation();set('image_url','');}}>×</button>}
+          {f.image_url&&<button className="nfg-img-slot-rm" type="button" style={{right:30}} onClick={e=>{e.stopPropagation();pickFile();}}>↑</button>}
+          {!f.image_url&&<><span className="nfg-img-slot-icon">+</span><span className="nfg-img-slot-lbl">Bild hochladen</span></>}
+          {uploading&&<div className="nfg-img-uploading">Lädt…</div>}
+        </div>
+        {err&&<p className="nfg-err">{err}</p>}
+        <div className="nfg-form-actions">
+          <button className="nfg-btn-primary" type="submit" disabled={saving} style={{opacity:saving?0.7:1}}>{saving?'Speichern…':initial?'Speichern':'Event erstellen'}</button>
+          <button className="nfg-btn-ghost" type="button" onClick={onClose}>Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>;
+}
+
+// ── Verwalten — Events tab ──────────────────────────────────────
+function EventsTab({events,setEvents}) {
+  const [formItem,setFormItem]=useState(null);
+  const [confirmDel,setConfirmDel]=useState(null);
+  const [deleting,setDeleting]=useState(false);
+  const sorted=[...events].sort((a,b)=>a.date_start<b.date_start?-1:1);
+
+  const handleSave=async(payload,isEdit)=>{
+    if(isEdit){
+      const{id,...data}=payload;
+      const{data:row,error}=await db.from('events').update(data).eq('id',id).select().single();
+      if(error) return error.message;
+      setEvents(prev=>prev.map(x=>x.id===id?row:x));
+    }else{
+      const{data:row,error}=await db.from('events').insert(payload).select().single();
+      if(error) return error.message;
+      setEvents(prev=>[...prev,row]);
+    }
+    return null;
+  };
+
+  const handleDelete=async id=>{
+    setDeleting(true);
+    await db.from('events').delete().eq('id',id);
+    setEvents(prev=>prev.filter(x=>x.id!==id));
+    setDeleting(false); setConfirmDel(null);
+  };
+
+  return <>
+    <p className="nfg-page-sub">{events.length} {events.length===1?'Event':'Events'} erfasst</p>
+    <div className="nfg-admin-bar">
+      <div/>
+      <button className="nfg-btn-primary" onClick={()=>setFormItem(false)}>+ Neues Event</button>
+    </div>
+    {sorted.length===0&&<div className="nfg-empty">Noch keine Events. Erstelle das erste Event.</div>}
+    <div className="nfg-admin-list">
+      {sorted.map(ev=><div key={ev.id} className="nfg-admin-item">
+        {ev.image_url
+          ?<img src={ev.image_url} alt={ev.title} style={{width:56,height:40,objectFit:'cover',borderRadius:6,flexShrink:0}}/>
+          :<div className="nfg-admin-dot" style={{background:'#8b5cf6'}}/>}
+        <div className="nfg-admin-info">
+          <div className="nfg-admin-name">{ev.title}</div>
+          <div className="nfg-admin-meta">{fmtEventDate(ev.date_start,ev.date_end)}{ev.short?` · ${ev.short.slice(0,70)}${ev.short.length>70?'…':''}`:''}</div>
+        </div>
+        <div className="nfg-admin-actions">
+          <button className="nfg-btn-sm nfg-btn-sm-edit" onClick={()=>setFormItem(ev)}>Bearbeiten</button>
+          <button className="nfg-btn-sm nfg-btn-sm-del" onClick={()=>setConfirmDel(ev)}>Löschen</button>
+        </div>
+      </div>)}
+    </div>
+    {formItem!==null&&<EventFormModal initial={formItem||null} onClose={()=>setFormItem(null)} onSave={handleSave}/>}
+    {confirmDel&&<div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&setConfirmDel(null)}>
+      <div className="nfg-form-sheet" style={{maxWidth:420}}>
+        <h3 style={{margin:'0 0 12px',fontSize:20,fontWeight:700}}>Event löschen?</h3>
+        <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>„{confirmDel.title}" wird dauerhaft entfernt.</p>
+        <div style={{display:'flex',gap:10}}>
+          <button className="nfg-btn-primary" style={{background:'#e53e3e',borderColor:'#e53e3e',color:'#fff'}} disabled={deleting} onClick={()=>handleDelete(confirmDel.id)}>
+            {deleting?'Löschen…':'Endgültig löschen'}
+          </button>
+          <button className="nfg-btn-ghost" onClick={()=>setConfirmDel(null)}>Abbrechen</button>
+        </div>
+      </div>
+    </div>}
+  </>;
+}
+
 // ── Verwalten — Betriebe tab ────────────────────────────────────
 function BetriebeTab({listings,setListings}) {
   const [filterType,setFilterType]=useState('');
@@ -1174,18 +1345,19 @@ function UserTab({currentUserId}) {
 }
 
 // ── Verwalten page ─────────────────────────────────────────────
-function VerwaltenPage({listings,setListings,currentUserId}) {
+function VerwaltenPage({listings,setListings,currentUserId,events,setEvents}) {
   const [vtab,setVtab]=useState('betriebe');
   return <div className="nfg-page">
     <h2 className="nfg-page-h">Verwalten</h2>
     <div style={{display:'flex',gap:4,marginBottom:24,background:'#f0f0f0',borderRadius:12,padding:4,width:'fit-content'}}>
-      {[['betriebe','Betriebe'],['user','User']].map(([id,lbl])=>
+      {[['betriebe','Betriebe'],['events','Events'],['user','User']].map(([id,lbl])=>
         <button key={id} onClick={()=>setVtab(id)} style={{border:'none',borderRadius:9,padding:'8px 20px',fontFamily:'inherit',fontSize:14,fontWeight:700,cursor:'pointer',background:vtab===id?'#000':'transparent',color:vtab===id?'#fff':'#666',transition:'all 0.15s'}}>
           {lbl}
         </button>
       )}
     </div>
     {vtab==='betriebe'&&<BetriebeTab listings={listings} setListings={setListings}/>}
+    {vtab==='events'  &&<EventsTab events={events} setEvents={setEvents}/>}
     {vtab==='user'    &&<UserTab currentUserId={currentUserId}/>}
   </div>;
 }
@@ -1196,6 +1368,7 @@ function App() {
   const [user,setUser]=useState(null);
   const [userRole,setUserRole]=useState(null);
   const [listings,setListings]=useState([]);
+  const [events,setEvents]=useState([]);
   const [saved,setSaved]=useState([]);
   const savedRef=useRef([]);
   useEffect(()=>{ savedRef.current=saved; },[saved]);
@@ -1227,6 +1400,9 @@ function App() {
     db.from('unternehmen').select('*').order('name').then(({data})=>{
       if(data) setListings(data);
       listDone=true; check();
+    });
+    db.from('events').select('*').order('date_start').then(({data})=>{
+      if(data) setEvents(data);
     });
     return ()=>subscription.unsubscribe();
   },[]);
@@ -1266,8 +1442,8 @@ function App() {
     <main className="nfg-main">
       {tab==='guide'     &&<GuidePage {...shared}/>}
       {tab==='merkliste' &&<MerklistePage {...shared} user={user} onAuth={onAuth}/>}
-      {tab==='mehr'      &&<MehrPage listings={listings}/>}
-      {tab==='verwalten' &&isAdmin&&<VerwaltenPage listings={listings} setListings={setListings} currentUserId={user?.id}/>}
+      {tab==='mehr'      &&<MehrPage events={events}/>}
+      {tab==='verwalten' &&isAdmin&&<VerwaltenPage listings={listings} setListings={setListings} currentUserId={user?.id} events={events} setEvents={setEvents}/>}
       {tab==='verwalten' &&!isAdmin&&<div className="nfg-page"><h2 className="nfg-page-h">Verwalten</h2><p className="nfg-login-hint">{user?'Du hast keine Berechtigung für die Verwaltung.':'Bitte einloggen.'}</p>{!user&&<button className="nfg-btn-primary" onClick={()=>onAuth('login')}>Anmelden</button>}</div>}
     </main>
     <MobileNav tab={tab} setTab={setTab} savedCount={saved.length} user={user} isAdmin={isAdmin} onAuth={onAuth}/>
