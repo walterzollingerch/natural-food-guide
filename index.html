@@ -204,7 +204,7 @@ body { background: var(--nfg-bg); font-family: var(--nfg-sans); color: var(--nfg
 .nfg-like-btn { display: inline-flex; align-items: center; gap: 7px; border: 2px solid var(--nfg-line); border-radius: 999px; padding: 7px 16px; font-size: 13px; font-weight: 700; cursor: pointer; background: #fff; transition: all 0.15s; color: #555; font-family: var(--nfg-sans); }
 .nfg-like-btn.on { background: #fff0f3; border-color: #d0003e; color: #d0003e; }
 .nfg-like-btn:not(.on):hover { border-color: #d0003e; color: #d0003e; }
-.nfg-card-like { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #aaa; border: none; background: none; padding: 0; cursor: pointer; font-family: var(--nfg-sans); transition: color 0.12s; margin-top: 5px; }
+.nfg-card-like { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #bbb; border: none; background: none; padding: 2px 0; cursor: pointer; font-family: var(--nfg-sans); transition: color 0.12s; flex-shrink: 0; }
 .nfg-card-like.on { color: #d0003e; }
 .nfg-card-like:not(.on):hover { color: #d0003e; }
 .nfg-admin-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
@@ -713,11 +713,13 @@ function ListingCard({item,onOpen,saved,onSave,liked,likeCount,onLike}) {
       </div>
       <h3 className="nfg-card-name">{item.name}</h3>
       <p className="nfg-card-short">{item.short}</p>
-      <div className="nfg-card-tags">{(item.tags||[]).slice(0,3).map(t=><span key={t} className="nfg-card-tag">{t}</span>)}</div>
-      {(likeCount>0||liked)&&<button className={'nfg-card-like'+(liked?' on':'')} onClick={e=>{e.stopPropagation();onLike(item.id);}}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill={liked?'currentColor':'none'} stroke="currentColor" strokeWidth="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-        {likeCount>0?likeCount:''}
-      </button>}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:6,gap:8}}>
+        <div className="nfg-card-tags" style={{margin:0,flex:1,minWidth:0}}>{(item.tags||[]).slice(0,3).map(t=><span key={t} className="nfg-card-tag">{t}</span>)}</div>
+        <button className={'nfg-card-like'+(liked?' on':'')} onClick={e=>{e.stopPropagation();onLike(item.id);}}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill={liked?'currentColor':'none'} stroke="currentColor" strokeWidth="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          {likeCount>0&&<span>{likeCount}</span>}
+        </button>
+      </div>
     </div>
   </article>;
 }
