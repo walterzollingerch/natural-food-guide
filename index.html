@@ -1903,7 +1903,7 @@ function App() {
       ref_id:refId?String(refId):null,
       fingerprint:localFp,
       user_id:userRef.current?.id||null
-    });
+    }).then(()=>{});  // .then() nötig: Supabase JS v2 ist lazy — ohne .then()/await wird der Request nie abgeschickt
   },[localFp]);
   const [tab,setTab]=useState('guide');
   const [open,setOpen]=useState(null);
@@ -1947,8 +1947,8 @@ function App() {
       data.forEach(l=>{ counts[l.unternehmen_id]=(counts[l.unternehmen_id]||0)+1; });
       setLikeCounts(counts);
     });
-    // Seitenbesuch tracken (einmalig beim Laden)
-    db.from('analytics_events').insert({event_type:'page_view',ref_id:null,fingerprint:localFp,user_id:null});
+    // Seitenbesuch tracken (einmalig beim Laden) — .then() nötig wegen Supabase lazy evaluation
+    db.from('analytics_events').insert({event_type:'page_view',ref_id:null,fingerprint:localFp,user_id:null}).then(()=>{});
     return ()=>subscription.unsubscribe();
   },[]);
 
