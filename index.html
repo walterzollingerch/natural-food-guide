@@ -1813,8 +1813,9 @@ function UserTab({currentUserId}) {
   };
 
   const handleEdit=async(id,{name,role})=>{
-    const{error}=await db.from('user_profiles').update({name,role}).eq('id',id);
+    const{data,error}=await db.from('user_profiles').update({name,role}).eq('id',id).select();
     if(error) return error.message;
+    if(!data||data.length===0) return 'Keine Berechtigung. Admin-Policy in Supabase prüfen.';
     setUsers(prev=>prev.map(x=>x.id===id?{...x,name,role}:x));
     return null;
   };
