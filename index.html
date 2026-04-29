@@ -207,6 +207,25 @@ body { background: var(--nfg-bg); font-family: var(--nfg-sans); color: var(--nfg
 .nfg-card-like { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #bbb; border: none; background: none; padding: 2px 0; cursor: pointer; font-family: var(--nfg-sans); transition: color 0.12s; flex-shrink: 0; }
 .nfg-card-like.on { color: #d0003e; }
 .nfg-card-like:not(.on):hover { color: #d0003e; }
+.nfg-analytics-sum { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 12px; margin-bottom: 24px; }
+.nfg-stat-card { background: #fff; border: 1px solid var(--nfg-line); border-radius: 14px; padding: 16px 18px; }
+.nfg-stat-icon { font-size: 20px; display: block; margin-bottom: 8px; }
+.nfg-stat-val { font-size: 28px; font-weight: 700; line-height: 1; color: #000; }
+.nfg-stat-lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #555; margin-top: 5px; }
+.nfg-stat-sub { font-size: 10px; color: #aaa; margin-top: 2px; }
+.nfg-analytics-h { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #666; margin: 26px 0 10px; }
+.nfg-top-list { display: flex; flex-direction: column; }
+.nfg-top-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--nfg-line); }
+.nfg-top-row:last-child { border-bottom: 0; }
+.nfg-top-rank { font-size: 11px; font-weight: 700; color: #aaa; width: 16px; flex-shrink: 0; text-align: center; }
+.nfg-top-name { flex: 1; font-size: 13px; font-weight: 600; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nfg-top-bar-wrap { width: 80px; flex-shrink: 0; background: #f0f0f0; border-radius: 3px; height: 6px; }
+.nfg-top-bar { height: 6px; background: var(--nfg-accent); border-radius: 3px; min-width: 3px; }
+.nfg-top-count { font-size: 12px; font-weight: 700; color: #000; width: 28px; text-align: right; flex-shrink: 0; }
+.nfg-minichart { display: flex; align-items: flex-end; gap: 5px; height: 72px; padding-bottom: 20px; position: relative; margin-bottom: 24px; }
+.nfg-minichart-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; height: 100%; }
+.nfg-minichart-fill { width: 100%; border-radius: 3px 3px 0 0; background: var(--nfg-accent); min-height: 3px; transition: height 0.3s; }
+.nfg-minichart-lbl { font-size: 9px; color: #aaa; white-space: nowrap; }
 .nfg-admin-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
 .nfg-admin-list { display: flex; flex-direction: column; gap: 8px; }
 .nfg-admin-item { background: #fff; border: 1px solid var(--nfg-line); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; transition: box-shadow 0.15s; }
@@ -357,6 +376,22 @@ ALTER TABLE likes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Likes öffentlich lesbar" ON likes FOR SELECT USING (true);
 CREATE POLICY "Jeder kann liken"        ON likes FOR INSERT WITH CHECK (true);
 CREATE POLICY "Like entfernen"          ON likes FOR DELETE USING (true);
+
+-- Tabelle: Analytics Events
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_type  TEXT NOT NULL,  -- 'page_view' | 'profile_view' | 'booking_click' | 'magazine_click' | 'event_click'
+  ref_id      TEXT,           -- unternehmen_id, magazine-UUID oder event-UUID je nach Typ
+  fingerprint TEXT,
+  user_id     UUID REFERENCES auth.users ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS analytics_events_idx ON analytics_events (event_type, created_at DESC);
+ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admins lesen Analytics"  ON analytics_events FOR SELECT USING (
+  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Jeder kann tracken"      ON analytics_events FOR INSERT WITH CHECK (true);
 
 -- Tabelle: Kommentare & Bewertungen
 CREATE TABLE IF NOT EXISTS comments (
@@ -734,7 +769,7 @@ const NFG_RELATIONS = {
   'schauenstein':{'sources':['sool-hof'],'delivers':[]}
 };
 
-function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth,liked,likeCount,onLike}) {
+function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth,liked,likeCount,onLike,onTrack}) {
   const rel = NFG_RELATIONS[item.id]||{sources:[],delivers:[]};
   const byId = id => listings.find(x=>x.id===id);
   const [comments,setComments]=useState([]);
@@ -795,7 +830,7 @@ function Profile({item,listings,onClose,saved,onSave,onOpen,user,onAuth,liked,li
         </div>}
         {item.top50&&<div className="nfg-top50-banner"><span className="nfg-top50-icon">★</span><div><b>Top 50 Farmers</b><small>Ausgezeichnet 2026</small></div></div>}
         <div className="nfg-actions">
-          {item.book&&item.booking_url&&<a className="nfg-btn-link" href={item.booking_url} target="_blank" rel="noopener noreferrer">Tisch reservieren ↗</a>}
+          {item.book&&item.booking_url&&<a className="nfg-btn-link" href={item.booking_url} target="_blank" rel="noopener noreferrer" onClick={()=>onTrack('booking_click',item.id)}>Tisch reservieren ↗</a>}
           {item.book&&!item.booking_url&&<button className="nfg-btn-primary">Tisch reservieren</button>}
           {item.website_url&&<a className="nfg-btn-link outline" href={item.website_url} target="_blank" rel="noopener noreferrer">Website ↗</a>}
           <button className={'nfg-btn-ghost'+(saved?' on':'')} onClick={()=>onSave(item.id)}>{saved?'✓ Gespeichert':'Merken'}</button>
@@ -950,7 +985,7 @@ function MerklistePage({listings,saved,onSave,onOpen,user,onAuth,onLike,likeCoun
 }
 
 // ── Mehr page ──────────────────────────────────────────────────
-function MehrPage({events,magazine}) {
+function MehrPage({events,magazine,onTrack}) {
   const upcoming=[...events].sort((a,b)=>a.date_start<b.date_start?-1:1);
   const mags=[...magazine].sort((a,b)=>(a.sort_order??0)-(b.sort_order??0));
   return <div className="nfg-page">
@@ -1002,7 +1037,7 @@ function MehrPage({events,magazine}) {
                   {m.short&&<p className="nfg-mag-short">{m.short}</p>}
                   {href&&<div className="nfg-mag-footer">
                     <a className="nfg-mag-cta" href={href} target="_blank" rel="noopener noreferrer"
-                       onClick={e=>{e.preventDefault();window.open(href,'_blank','noopener,noreferrer');}}>
+                       onClick={e=>{e.preventDefault();onTrack('magazine_click',m.id);window.open(href,'_blank','noopener,noreferrer');}}>
                       {m.doc_url?'↓ Dokument':'→ Lesen'}
                     </a>
                   </div>}
@@ -1024,7 +1059,7 @@ function MehrPage({events,magazine}) {
                 <b>{ev.title}</b>
                 {ev.short&&<span>{ev.short}</span>}
               </div>
-              {ev.link?<a className="nfg-link" href={ev.link} target="_blank" rel="noopener noreferrer">→</a>:<span/>}
+              {ev.link?<a className="nfg-link" href={ev.link} target="_blank" rel="noopener noreferrer" onClick={()=>onTrack('event_click',ev.id)}>→</a>:<span/>}
             </li>)}
           </ul>}
       </section>
@@ -1676,21 +1711,175 @@ function MagazineTab({magazine,setMagazine}) {
 }
 
 // ── Verwalten page ─────────────────────────────────────────────
+// ── Analytics ─────────────────────────────────────────────────
+function MiniChart({data}) {
+  const max=Math.max(...data.map(d=>d.count),1);
+  return <div className="nfg-minichart">
+    {data.map(({day,count})=>{
+      const d=new Date(day+'T12:00:00');
+      const lbl=`${d.getDate()}.${d.getMonth()+1}.`;
+      return <div key={day} className="nfg-minichart-col">
+        <div className="nfg-minichart-fill" style={{height:Math.max(3,Math.round(count/max*48))+'px',opacity:count?1:0.25}}/>
+        <span className="nfg-minichart-lbl">{lbl}</span>
+      </div>;
+    })}
+  </div>;
+}
+
+function StatCard({icon,label,value,sub}) {
+  return <div className="nfg-stat-card">
+    <span className="nfg-stat-icon">{icon}</span>
+    <div className="nfg-stat-val">{value}</div>
+    <div className="nfg-stat-lbl">{label}</div>
+    {sub&&<div className="nfg-stat-sub">{sub}</div>}
+  </div>;
+}
+
+function TopList({rows,max}) {
+  if(!rows.length) return <p style={{fontSize:13,color:'#aaa',margin:'8px 0'}}>Keine Daten.</p>;
+  return <div className="nfg-top-list">
+    {rows.map(([name,count],i)=><div key={i} className="nfg-top-row">
+      <span className="nfg-top-rank">{i+1}</span>
+      <span className="nfg-top-name" title={name}>{name}</span>
+      <div className="nfg-top-bar-wrap"><div className="nfg-top-bar" style={{width:Math.round(count/max*80)+'px'}}/></div>
+      <span className="nfg-top-count">{count}</span>
+    </div>)}
+  </div>;
+}
+
+function AnalyticsTab({listings,events,magazine}) {
+  const [loading,setLoading]=useState(true);
+  const [stats,setStats]=useState(null);
+
+  useEffect(()=>{
+    const since30=new Date(Date.now()-30*24*60*60*1000).toISOString();
+    Promise.all([
+      db.from('analytics_events').select('event_type,ref_id,fingerprint,created_at').gte('created_at',since30).limit(50000),
+      db.from('likes').select('unternehmen_id,created_at').limit(50000),
+      db.from('comments').select('unternehmen_id,created_at').limit(50000),
+    ]).then(([evRes,likesRes,commRes])=>{
+      const evts=evRes.data||[];
+      const likes=likesRes.data||[];
+      const comms=commRes.data||[];
+
+      // Zähler nach Typ
+      const byType={};
+      evts.forEach(e=>{ byType[e.event_type]=(byType[e.event_type]||0)+1; });
+
+      // Unique visitors (distinct fingerprints bei page_view)
+      const uniqueVis=new Set(evts.filter(e=>e.event_type==='page_view').map(e=>e.fingerprint)).size;
+
+      // Top by ref_id für verschiedene Event-Typen
+      const topFor=type=>{
+        const counts={};
+        evts.filter(e=>e.event_type===type&&e.ref_id).forEach(e=>{ counts[e.ref_id]=(counts[e.ref_id]||0)+1; });
+        return counts;
+      };
+      const profileCounts=topFor('profile_view');
+      const bookingCounts=topFor('booking_click');
+      const magCounts=topFor('magazine_click');
+      const evtCounts=topFor('event_click');
+
+      // Likes / Kommentare pro Betrieb (alle Zeiten)
+      const likesByItem={};  likes.forEach(l=>{ likesByItem[l.unternehmen_id]=(likesByItem[l.unternehmen_id]||0)+1; });
+      const commsByItem={};  comms.forEach(c=>{ commsByItem[c.unternehmen_id]=(commsByItem[c.unternehmen_id]||0)+1; });
+
+      // Seitenbesuche letzte 7 Tage
+      const daily=Array.from({length:7},(_,i)=>{
+        const d=new Date(); d.setDate(d.getDate()-(6-i));
+        const day=d.toISOString().slice(0,10);
+        return {day,count:evts.filter(e=>e.event_type==='page_view'&&e.created_at.slice(0,10)===day).length};
+      });
+
+      // Likes der letzten 30 Tage
+      const likes30=likes.filter(l=>l.created_at>=since30).length;
+      const comms30=comms.filter(c=>c.created_at>=since30).length;
+
+      // Hilfsfunktion: ref_id → Name
+      const bizName=id=>listings.find(x=>x.id===id)?.name||id;
+      const magName=id=>magazine.find(x=>x.id===id)?.title||id;
+      const evName =id=>events.find(x=>x.id===id)?.title||id;
+
+      const sortedTop=(counts,nameFn,n=6)=>
+        Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,n).map(([id,c])=>[nameFn(id),c]);
+
+      setStats({
+        byType,uniqueVis,daily,likes30,comms30,
+        topProfiles:sortedTop(profileCounts,bizName),
+        topBookings:sortedTop(bookingCounts,bizName),
+        topLikes:sortedTop(likesByItem,bizName),
+        topComments:sortedTop(commsByItem,bizName),
+        topMag:sortedTop(magCounts,magName),
+        topEvt:sortedTop(evtCounts,evName),
+      });
+      setLoading(false);
+    });
+  },[]);
+
+  if(loading) return <p style={{color:'#666',fontSize:14,marginTop:20}}>Lade Analytics…</p>;
+  const s=stats;
+  const maxTop=rows=>rows.length?rows[0][1]:1;
+
+  return <div>
+    <div className="nfg-analytics-sum">
+      <StatCard icon="👁" label="Seitenbesuche" value={s.byType['page_view']||0} sub="letzte 30 Tage"/>
+      <StatCard icon="👤" label="Unique Visitors" value={s.uniqueVis} sub="letzte 30 Tage"/>
+      <StatCard icon="🏪" label="Betriebsaufrufe" value={s.byType['profile_view']||0} sub="letzte 30 Tage"/>
+      <StatCard icon="📅" label="Buchungsklicks" value={s.byType['booking_click']||0} sub="letzte 30 Tage"/>
+      <StatCard icon="❤️" label="Neue Likes" value={s.likes30} sub="letzte 30 Tage"/>
+      <StatCard icon="💬" label="Kommentare" value={s.comms30} sub="letzte 30 Tage"/>
+      <StatCard icon="📖" label="Magazin-Klicks" value={s.byType['magazine_click']||0} sub="letzte 30 Tage"/>
+      <StatCard icon="🎟" label="Event-Klicks" value={s.byType['event_click']||0} sub="letzte 30 Tage"/>
+    </div>
+
+    <div className="nfg-analytics-h">Seitenbesuche — letzte 7 Tage</div>
+    <MiniChart data={s.daily}/>
+
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:24}}>
+      <div>
+        <div className="nfg-analytics-h">Top Betriebe — Aufrufe</div>
+        <TopList rows={s.topProfiles} max={maxTop(s.topProfiles)}/>
+      </div>
+      <div>
+        <div className="nfg-analytics-h">Top Betriebe — Buchungsklicks</div>
+        <TopList rows={s.topBookings} max={maxTop(s.topBookings)}/>
+      </div>
+      <div>
+        <div className="nfg-analytics-h">Top Betriebe — Likes</div>
+        <TopList rows={s.topLikes} max={maxTop(s.topLikes)}/>
+      </div>
+      <div>
+        <div className="nfg-analytics-h">Top Betriebe — Kommentare</div>
+        <TopList rows={s.topComments} max={maxTop(s.topComments)}/>
+      </div>
+      {s.topMag.length>0&&<div>
+        <div className="nfg-analytics-h">Magazin — Klicks</div>
+        <TopList rows={s.topMag} max={maxTop(s.topMag)}/>
+      </div>}
+      {s.topEvt.length>0&&<div>
+        <div className="nfg-analytics-h">Events — Klicks</div>
+        <TopList rows={s.topEvt} max={maxTop(s.topEvt)}/>
+      </div>}
+    </div>
+  </div>;
+}
+
 function VerwaltenPage({listings,setListings,currentUserId,events,setEvents,magazine,setMagazine}) {
   const [vtab,setVtab]=useState('betriebe');
   return <div className="nfg-page">
     <h2 className="nfg-page-h">Verwalten</h2>
     <div style={{display:'flex',gap:4,marginBottom:24,background:'#f0f0f0',borderRadius:12,padding:4,width:'fit-content',flexWrap:'wrap'}}>
-      {[['betriebe','Betriebe'],['events','Events'],['magazin','Magazin'],['user','User']].map(([id,lbl])=>
+      {[['betriebe','Betriebe'],['events','Events'],['magazin','Magazin'],['user','User'],['analytics','Analytics']].map(([id,lbl])=>
         <button key={id} onClick={()=>setVtab(id)} style={{border:'none',borderRadius:9,padding:'8px 20px',fontFamily:'inherit',fontSize:14,fontWeight:700,cursor:'pointer',background:vtab===id?'#000':'transparent',color:vtab===id?'#fff':'#666',transition:'all 0.15s'}}>
           {lbl}
         </button>
       )}
     </div>
-    {vtab==='betriebe'&&<BetriebeTab listings={listings} setListings={setListings}/>}
-    {vtab==='events'  &&<EventsTab events={events} setEvents={setEvents}/>}
-    {vtab==='magazin' &&<MagazineTab magazine={magazine} setMagazine={setMagazine}/>}
-    {vtab==='user'    &&<UserTab currentUserId={currentUserId}/>}
+    {vtab==='betriebe' &&<BetriebeTab listings={listings} setListings={setListings}/>}
+    {vtab==='events'   &&<EventsTab events={events} setEvents={setEvents}/>}
+    {vtab==='magazin'  &&<MagazineTab magazine={magazine} setMagazine={setMagazine}/>}
+    {vtab==='user'     &&<UserTab currentUserId={currentUserId}/>}
+    {vtab==='analytics'&&<AnalyticsTab listings={listings} events={events} magazine={magazine}/>}
   </div>;
 }
 
@@ -1718,6 +1907,18 @@ function App() {
     }
     return fp;
   },[]);
+  // userRef — für stabilen Zugriff in track() ohne stale closure
+  const userRef=useRef(null);
+  useEffect(()=>{ userRef.current=user; },[user]);
+  // track() — fire & forget, kein await nötig
+  const track=useCallback((eventType,refId=null)=>{
+    db.from('analytics_events').insert({
+      event_type:eventType,
+      ref_id:refId?String(refId):null,
+      fingerprint:localFp,
+      user_id:userRef.current?.id||null
+    });
+  },[localFp]);
   const [tab,setTab]=useState('guide');
   const [open,setOpen]=useState(null);
   const [authModal,setAuthModal]=useState(null);
@@ -1760,6 +1961,8 @@ function App() {
       data.forEach(l=>{ counts[l.unternehmen_id]=(counts[l.unternehmen_id]||0)+1; });
       setLikeCounts(counts);
     });
+    // Seitenbesuch tracken (einmalig beim Laden)
+    db.from('analytics_events').insert({event_type:'page_view',ref_id:null,fingerprint:localFp,user_id:null});
     return ()=>subscription.unsubscribe();
   },[]);
 
@@ -1831,8 +2034,10 @@ function App() {
     }
   },[user,localFp]);
 
+  const onOpen=useCallback(item=>{ setOpen(item); track('profile_view',item.id); },[track]);
+
   const likeProps={onLike,likeCounts,myLikes};
-  const shared={listings,saved,onSave,onOpen:setOpen,...likeProps};
+  const shared={listings,saved,onSave,onOpen,...likeProps};
   const isAdmin=userRole==='admin';
 
   if(!ready) return <Loader/>;
@@ -1842,12 +2047,12 @@ function App() {
     <main className="nfg-main">
       {tab==='guide'     &&<GuidePage {...shared}/>}
       {tab==='merkliste' &&<MerklistePage {...shared} user={user} onAuth={onAuth}/>}
-      {tab==='mehr'      &&<MehrPage events={events} magazine={magazine}/>}
+      {tab==='mehr'      &&<MehrPage events={events} magazine={magazine} onTrack={track}/>}
       {tab==='verwalten' &&isAdmin&&<VerwaltenPage listings={listings} setListings={setListings} currentUserId={user?.id} events={events} setEvents={setEvents} magazine={magazine} setMagazine={setMagazine}/>}
       {tab==='verwalten' &&!isAdmin&&<div className="nfg-page"><h2 className="nfg-page-h">Verwalten</h2><p className="nfg-login-hint">{user?'Du hast keine Berechtigung für die Verwaltung.':'Bitte einloggen.'}</p>{!user&&<button className="nfg-btn-primary" onClick={()=>onAuth('login')}>Anmelden</button>}</div>}
     </main>
     <MobileNav tab={tab} setTab={setTab} savedCount={saved.length} user={user} isAdmin={isAdmin} onAuth={onAuth}/>
-    {open&&listings.find(x=>x.id===open.id)&&<Profile item={open} listings={listings} onClose={()=>setOpen(null)} saved={saved.includes(open.id)} onSave={onSave} onOpen={setOpen} user={user} onAuth={onAuth} liked={myLikes.has(open.id)} likeCount={likeCounts[open.id]||0} onLike={onLike}/>}
+    {open&&listings.find(x=>x.id===open.id)&&<Profile item={open} listings={listings} onClose={()=>setOpen(null)} saved={saved.includes(open.id)} onSave={onSave} onOpen={onOpen} user={user} onAuth={onAuth} liked={myLikes.has(open.id)} likeCount={likeCounts[open.id]||0} onLike={onLike} onTrack={track}/>}
     {authModal&&<AuthModal mode={typeof authModal==='object'?authModal.mode:authModal} hint={typeof authModal==='object'?authModal.hint:null} onClose={()=>setAuthModal(null)} onAuth={u=>{setUser(u);setAuthModal(null);loadRole(u?.id??null);}}/>}
   </div>;
 }
