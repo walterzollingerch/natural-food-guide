@@ -854,12 +854,16 @@ function Sidebar({tab,setTab,user,onAuth,onLogout}) {
   return <aside className="nfg-sidebar">
     <div className="nfg-sidebar-brand">
       <div className="nfg-sidebar-by">by Soil to Soul</div>
-      <div className="nfg-sidebar-ttl">Kontakte</div>
+      <div className="nfg-sidebar-ttl">Stammdaten</div>
     </div>
     <nav>
+      <button className={'nfg-sidebar-btn'+(tab==='start'?' on':'')} onClick={()=>setTab('start')}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Übersicht
+      </button>
       <button className={'nfg-sidebar-btn'+(tab==='verwalten'?' on':'')} onClick={()=>setTab('verwalten')}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Kontakte
+        Stammdaten
       </button>
     </nav>
     <div className="nfg-sidebar-foot">
@@ -883,9 +887,13 @@ function Sidebar({tab,setTab,user,onAuth,onLogout}) {
 // ── Mobile nav ─────────────────────────────────────────────────
 function MobileNav({tab,setTab}) {
   return <nav className="nfg-mobile-nav">
+    <button className={tab==='start'?'on':''} onClick={()=>setTab('start')}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Übersicht
+    </button>
     <button className={tab==='verwalten'?'on':''} onClick={()=>setTab('verwalten')}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      Kontakte
+      Stammdaten
     </button>
   </nav>;
 }
@@ -3473,9 +3481,184 @@ function AnalyticsTab({listings,events,magazine}) {
   </div>;
 }
 
+// ── Aktivität Übersicht (Startseite) ───────────────────────────
+function AktivitaetUebersicht() {
+  const [aktivitaeten, setAktivitaeten] = useState([]);
+  const [selectedId, setSelectedId]     = useState('');
+  const [showAbgeschlossen, setShowAbgeschlossen] = useState(false);
+  const [akt, setAkt]           = useState(null);
+  const [teilnehmer, setTeilnehmer] = useState([]);
+  const [kontakte, setKontakte]   = useState([]);
+  const [loading, setLoading]     = useState(false);
+
+  // Lade alle Aktivitäten für Dropdown
+  useEffect(() => {
+    db.from('crm_aktivitaeten').select('id,titel,typ,status,datum_von,datum_bis,ort,beschreibung')
+      .order('datum_von', {ascending: false, nullsFirst: false})
+      .then(({data}) => {
+        setAktivitaeten(data || []);
+        // Auto-select erste nicht-abgeschlossene
+        const first = (data||[]).find(a => a.status !== 'abgeschlossen' && a.status !== 'abgesagt');
+        if (first) setSelectedId(first.id);
+      });
+  }, []);
+
+  // Lade Detail wenn ID wechselt
+  useEffect(() => {
+    if (!selectedId) { setAkt(null); setTeilnehmer([]); setKontakte([]); return; }
+    setLoading(true);
+    Promise.all([
+      db.from('crm_aktivitaeten').select('*').eq('id', selectedId).single(),
+      db.from('crm_unternehmen_aktivitaeten').select('*,crm_unternehmen(*)').eq('aktivitaet_id', selectedId),
+      db.from('crm_contacts_overview').select('id,vorname,nachname,funktion,email,telefon,kategorie_id,kategorie_farbe,kategorie_name,unternehmen_id,unternehmen_name,anfrage_verschickt,pm_geschickt,nachgehakt,do_not_contact').eq('unternehmen_id.in', '(select unternehmen_id from crm_unternehmen_aktivitaeten where aktivitaet_id=\'' + selectedId + '\')')
+    ]).then(([{data: a}, {data: t}]) => {
+      setAkt(a);
+      setTeilnehmer(t || []);
+      setLoading(false);
+      // Lade Kontakte für teilnehmende Unternehmen
+      const untIds = (t||[]).map(x => x.unternehmen_id);
+      if (untIds.length > 0) {
+        db.from('crm_contacts_overview')
+          .select('id,vorname,nachname,funktion,email,telefon,kategorie_id,kategorie_farbe,kategorie_name,unternehmen_id,unternehmen_name,anfrage_verschickt,pm_geschickt,nachgehakt,do_not_contact')
+          .in('unternehmen_id', untIds)
+          .then(({data: c}) => setKontakte(c || []));
+      } else {
+        setKontakte([]);
+      }
+    });
+  }, [selectedId]);
+
+  const sichtbar = aktivitaeten.filter(a =>
+    showAbgeschlossen ? true : (a.status !== 'abgeschlossen' && a.status !== 'abgesagt')
+  );
+
+  const typ = akt ? (AKT_TYP[akt.typ] || AKT_TYP.sonstiges) : null;
+
+  // Stats
+  const zugesagt  = teilnehmer.filter(t => t.zusage_status === 'ja').length;
+  const abgesagt  = teilnehmer.filter(t => t.zusage_status === 'Absage').length;
+  const offen     = teilnehmer.length - zugesagt - abgesagt;
+  const pmCount   = kontakte.filter(c => c.pm_geschickt).length;
+  const anfCount  = kontakte.filter(c => c.anfrage_verschickt).length;
+  const dncCount  = kontakte.filter(c => c.do_not_contact).length;
+
+  return <div className="nfg-page">
+    <h2 className="nfg-page-h">Übersicht</h2>
+
+    {/* Aktivität wählen */}
+    <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:24,flexWrap:'wrap'}}>
+      <div style={{flex:'1 1 280px',maxWidth:480}}>
+        <select className="nfg-select" style={{width:'100%',fontSize:15,padding:'10px 14px'}}
+          value={selectedId} onChange={e => setSelectedId(e.target.value)}>
+          <option value="">— Aktivität wählen —</option>
+          {sichtbar.map(a => {
+            const t = AKT_TYP[a.typ] || AKT_TYP.sonstiges;
+            const yr = a.datum_von ? ` (${a.datum_von.slice(0,4)})` : '';
+            return <option key={a.id} value={a.id}>{t.icon} {a.titel}{yr}</option>;
+          })}
+        </select>
+      </div>
+      <label style={{display:'flex',alignItems:'center',gap:7,fontSize:13,color:'#666',cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>
+        <input type="checkbox" checked={showAbgeschlossen} onChange={e => setShowAbgeschlossen(e.target.checked)}
+          style={{width:15,height:15,cursor:'pointer'}}/>
+        Abgeschlossene anzeigen
+      </label>
+    </div>
+
+    {!selectedId && <div className="nfg-empty">Aktivität auswählen, um die Übersicht zu laden.</div>}
+
+    {loading && <div style={{padding:'40px 0',textAlign:'center',color:'#888'}}>Laden…</div>}
+
+    {akt && !loading && <>
+      {/* Header Aktivität */}
+      <div style={{background:'#fff',border:'1px solid var(--nfg-line)',borderRadius:16,padding:'20px 24px',marginBottom:20}}>
+        <div style={{display:'flex',gap:10,alignItems:'flex-start',flexWrap:'wrap',justifyContent:'space-between'}}>
+          <div>
+            <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
+              <span style={{fontSize:24}}>{typ.icon}</span>
+              <span style={{fontSize:12,fontWeight:700,color:typ.color,textTransform:'uppercase',letterSpacing:'0.06em'}}>{typ.label}</span>
+              <AktBadge status={akt.status}/>
+            </div>
+            <h3 style={{margin:'0 0 6px',fontSize:22,fontWeight:700}}>{akt.titel}</h3>
+            <div style={{fontSize:13,color:'#666',display:'flex',gap:16,flexWrap:'wrap'}}>
+              {akt.datum_von && <span>📅 {fmtDate(akt.datum_von)}{akt.datum_bis && akt.datum_bis !== akt.datum_von ? ` – ${fmtDate(akt.datum_bis)}` : ''}</span>}
+              {akt.ort && <span>📍 {akt.ort}</span>}
+            </div>
+            {akt.beschreibung && <p style={{margin:'10px 0 0',fontSize:13,color:'#555',lineHeight:1.6,maxWidth:600}}>{akt.beschreibung}</p>}
+          </div>
+        </div>
+      </div>
+
+      {/* KPI-Karten */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:10,marginBottom:24}}>
+        {[
+          {n: teilnehmer.length, lbl:'Unternehmen', bg:'#f0f9ff', col:'#0369a1'},
+          {n: kontakte.length,   lbl:'Kontakte',    bg:'#f5f3ff', col:'#6d28d9'},
+          {n: zugesagt,          lbl:'Zugesagt',    bg:'#dcfce7', col:'#166534'},
+          {n: abgesagt,          lbl:'Absagen',     bg:'#fee2e2', col:'#b91c1c'},
+          {n: offen,             lbl:'Offen',       bg:'#fef9c3', col:'#92400e'},
+          {n: anfCount,          lbl:'Anfragen',    bg:'#f0fdf4', col:'#15803d'},
+          {n: pmCount,           lbl:'PM verschickt',bg:'#fff7ed',col:'#c2410c'},
+          {n: dncCount,          lbl:'Do Not Contact',bg:'#fafafa',col:'#ef4444'},
+        ].map(({n,lbl,bg,col}) =>
+          <div key={lbl} style={{background:bg,border:`1.5px solid ${col}25`,borderRadius:12,padding:'14px 16px',textAlign:'center'}}>
+            <div style={{fontSize:28,fontWeight:700,color:col,lineHeight:1}}>{n}</div>
+            <div style={{fontSize:10,fontWeight:700,color:col,textTransform:'uppercase',letterSpacing:'0.05em',marginTop:4}}>{lbl}</div>
+          </div>
+        )}
+      </div>
+
+      {/* Teilnehmende Unternehmen */}
+      {teilnehmer.length > 0 && <section style={{marginBottom:24}}>
+        <h3 style={{fontSize:16,fontWeight:700,margin:'0 0 12px'}}>🏢 Teilnehmende Unternehmen ({teilnehmer.length})</h3>
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {teilnehmer.map(t => {
+            const u = t.crm_unternehmen; if (!u) return null;
+            const untKontakte = kontakte.filter(c => c.unternehmen_id === t.unternehmen_id);
+            const statusColor = t.zusage_status === 'ja' ? '#166534' : t.zusage_status === 'Absage' ? '#b91c1c' : '#92400e';
+            const statusBg    = t.zusage_status === 'ja' ? '#dcfce7' : t.zusage_status === 'Absage' ? '#fee2e2' : '#fef9c3';
+            return <div key={t.unternehmen_id} style={{background:'#fff',border:'1px solid var(--nfg-line)',borderRadius:12,padding:'12px 16px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom: untKontakte.length ? 10 : 0}}>
+                <span style={{fontSize:16}}>🏢</span>
+                <div style={{flex:1}}>
+                  <span style={{fontWeight:700,fontSize:14}}>{u.name}</span>
+                  {u.mediengruppe && <span style={{fontSize:11,color:'#888',marginLeft:8}}>{u.mediengruppe}</span>}
+                  {u.medientyp && <span style={{fontSize:11,color:'#aaa',marginLeft:6}}>· {u.medientyp}</span>}
+                </div>
+                <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                  {t.rolle && <span style={{fontSize:11,fontWeight:700,color:'#555',background:'#f3f4f6',padding:'2px 8px',borderRadius:6}}>{t.rolle}</span>}
+                  {t.zusage_status && <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:999,background:statusBg,color:statusColor}}>{t.zusage_status}</span>}
+                  <span style={{fontSize:11,color:'#aaa'}}>{untKontakte.length} Kontakt{untKontakte.length !== 1 ? 'e' : ''}</span>
+                </div>
+              </div>
+              {untKontakte.length > 0 && <div style={{display:'flex',flexDirection:'column',gap:4,paddingLeft:26}}>
+                {untKontakte.map(c => <div key={c.id} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',fontSize:12,padding:'5px 10px',background:'#f9fafb',borderRadius:8}}>
+                  <span style={{fontWeight:700,color:'#000',minWidth:120}}>{c.vorname} {c.nachname}</span>
+                  {c.funktion && <span style={{color:'#888'}}>· {c.funktion}</span>}
+                  {c.email && <a href={`mailto:${c.email}`} style={{color:'#3b82f6',fontWeight:500,textDecoration:'none'}}>✉ {c.email}</a>}
+                  {c.telefon && <span style={{color:'#666'}}>📞 {c.telefon}</span>}
+                  <div style={{display:'flex',gap:4,marginLeft:'auto'}}>
+                    {c.anfrage_verschickt && <span style={{fontSize:10,background:'#dcfce7',color:'#166534',padding:'1px 6px',borderRadius:4,fontWeight:700}}>Anfrage ✓</span>}
+                    {c.pm_geschickt && <span style={{fontSize:10,background:'#eff6ff',color:'#1d4ed8',padding:'1px 6px',borderRadius:4,fontWeight:700}}>PM ✓</span>}
+                    {c.nachgehakt === 'ja' && <span style={{fontSize:10,background:'#f0fdf4',color:'#15803d',padding:'1px 6px',borderRadius:4,fontWeight:700}}>Nachgehakt ✓</span>}
+                    {c.nachgehakt === 'Absage' && <span style={{fontSize:10,background:'#fee2e2',color:'#b91c1c',padding:'1px 6px',borderRadius:4,fontWeight:700}}>Absage</span>}
+                    {c.do_not_contact && <span style={{fontSize:10,background:'#fafafa',color:'#ef4444',padding:'1px 6px',borderRadius:4,fontWeight:700,border:'1px solid #fca5a5'}}>⛔ DNC</span>}
+                  </div>
+                </div>)}
+              </div>}
+            </div>;
+          })}
+        </div>
+      </section>}
+
+      {teilnehmer.length === 0 && <div className="nfg-empty">Noch keine Unternehmen mit dieser Aktivität verknüpft.</div>}
+    </>}
+  </div>;
+}
+
 function VerwaltenPage({events}) {
   return <div className="nfg-page">
-    <h2 className="nfg-page-h">Kontakte</h2>
+    <h2 className="nfg-page-h">Stammdaten</h2>
     <CrmTab events={events}/>
   </div>;
 }
@@ -3547,7 +3730,7 @@ function App() {
       user_id:userRef.current?.id||null
     }).then(()=>{});  // .then() nötig: Supabase JS v2 ist lazy — ohne .then()/await wird der Request nie abgeschickt
   },[localFp]);
-  const [tab,setTab]=useState('verwalten');
+  const [tab,setTab]=useState('start');
   const [authModal,setAuthModal]=useState(null);
 
   const loadRole=useCallback(async uid=>{
@@ -3591,14 +3774,14 @@ function App() {
     <div className="nfg-shell">
       <Sidebar tab={tab} setTab={setTab} user={user} onAuth={onAuth} onLogout={onLogout}/>
       <main className="nfg-main">
-        {user
-          ? <VerwaltenPage events={events}/>
-          : <div className="nfg-page">
-              <h2 className="nfg-page-h">Kontakte</h2>
-              <p className="nfg-login-hint">Bitte melde dich an, um die Kontaktdatenbank zu verwenden.</p>
-              <button className="nfg-btn-primary" onClick={()=>onAuth('login')}>Anmelden</button>
-            </div>
-        }
+        {user ? <>
+          {tab==='start'     && <AktivitaetUebersicht/>}
+          {tab==='verwalten' && <VerwaltenPage events={events}/>}
+        </> : <div className="nfg-page">
+          <h2 className="nfg-page-h">Stammdaten</h2>
+          <p className="nfg-login-hint">Bitte melde dich an, um die Datenbank zu verwenden.</p>
+          <button className="nfg-btn-primary" onClick={()=>onAuth('login')}>Anmelden</button>
+        </div>}
       </main>
       <MobileNav tab={tab} setTab={setTab}/>
       {authModal&&<AuthModal mode={typeof authModal==='object'?authModal.mode:authModal} hint={typeof authModal==='object'?authModal.hint:null} onClose={()=>setAuthModal(null)} onAuth={u=>{setUser(u);setAuthModal(null);loadRole(u?.id??null);}}/>}
