@@ -1699,8 +1699,11 @@ function UserEditModal({user,isSelf,onClose,onSave}) {
   return <div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&onClose()}>
     <div className="nfg-form-sheet" style={{maxWidth:440}}>
       <button className="nfg-form-close" onClick={onClose}>×</button>
-      <h2 className="nfg-form-title">User bearbeiten</h2>
-      <p style={{fontSize:13,color:'#888',margin:'-16px 0 24px'}}>ID: {user.id.slice(0,8)}… · Registriert: {fmtDate(user.created_at)}</p>
+      <h2 className="nfg-form-title">Benutzer bearbeiten</h2>
+      <p style={{fontSize:13,color:'#888',margin:'-16px 0 24px'}}>
+        {user.email&&<span style={{display:'block'}}>{user.email}</span>}
+        Registriert: {fmtDate(user.created_at)}
+      </p>
       <form onSubmit={handleSubmit}>
         <div className="nfg-form-row one">
           <label className="nfg-label">Name *<input className="nfg-input" value={f.name} onChange={e=>set('name',e.target.value)} placeholder="Maria Muster" required/></label>
@@ -1710,8 +1713,8 @@ function UserEditModal({user,isSelf,onClose,onSave}) {
             Rolle
             {isSelf&&<small style={{fontWeight:400,color:'#888',marginLeft:6}}>(eigene Rolle nicht änderbar)</small>}
             <select className="nfg-input" value={f.role} onChange={e=>set('role',e.target.value)} disabled={isSelf}>
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
+              <option value="user">Benutzer</option>
+              <option value="admin">Administrator</option>
             </select>
           </label>
         </div>
@@ -1725,7 +1728,7 @@ function UserEditModal({user,isSelf,onClose,onSave}) {
   </div>;
 }
 
-// ── Verwalten — User erstellen Modal ──────────────────────────
+// ── Benutzer erstellen Modal ───────────────────────────────────
 function UserCreateModal({onClose,onSave}) {
   const [f,setF]=useState({email:'',password:'',name:'',role:'user'});
   const [err,setErr]=useState('');
@@ -1735,7 +1738,7 @@ function UserCreateModal({onClose,onSave}) {
   const handleSubmit=async e=>{
     e.preventDefault();
     if(!f.email.trim()||!f.password||!f.name.trim()){setErr('Alle Felder ausfüllen.');return;}
-    if(f.password.length<6){setErr('Passwort mindestens 6 Zeichen.');return;}
+    if(f.password.length<8){setErr('Passwort mindestens 8 Zeichen.');return;}
     setSaving(true); setErr('');
     const result=await onSave(f);
     if(result){setErr(result);setSaving(false);}
@@ -1745,7 +1748,7 @@ function UserCreateModal({onClose,onSave}) {
   return <div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&onClose()}>
     <div className="nfg-form-sheet" style={{maxWidth:440}}>
       <button className="nfg-form-close" onClick={onClose}>×</button>
-      <h2 className="nfg-form-title">Neuer User</h2>
+      <h2 className="nfg-form-title">Neuer Benutzer</h2>
       <form onSubmit={handleSubmit}>
         <div className="nfg-form-row one">
           <label className="nfg-label">Name *<input className="nfg-input" value={f.name} onChange={e=>set('name',e.target.value)} placeholder="Maria Muster" required/></label>
@@ -1754,18 +1757,18 @@ function UserCreateModal({onClose,onSave}) {
           <label className="nfg-label">E-Mail *<input className="nfg-input" type="email" value={f.email} onChange={e=>set('email',e.target.value)} placeholder="maria@example.ch" required/></label>
         </div>
         <div className="nfg-form-row one">
-          <label className="nfg-label">Passwort * <small style={{fontWeight:400,color:'#888'}}>(min. 6 Zeichen)</small><input className="nfg-input" type="password" value={f.password} onChange={e=>set('password',e.target.value)} placeholder="••••••••" required/></label>
+          <label className="nfg-label">Passwort * <small style={{fontWeight:400,color:'#888'}}>(min. 8 Zeichen)</small><input className="nfg-input" type="password" value={f.password} onChange={e=>set('password',e.target.value)} placeholder="••••••••" required/></label>
         </div>
         <div className="nfg-form-row one">
           <label className="nfg-label">Rolle<select className="nfg-input" value={f.role} onChange={e=>set('role',e.target.value)}>
-            <option value="user">User</option>
-            <option value="admin">Admin</option>
+            <option value="user">Benutzer</option>
+            <option value="admin">Administrator</option>
           </select></label>
         </div>
-        {!dbAdmin&&<p style={{fontSize:12,color:'#888',background:'#f0f0f0',borderRadius:8,padding:'10px 12px',margin:'0 0 12px',lineHeight:1.5}}>ℹ Kein Service-Key konfiguriert — der neue User erhält eine Bestätigungs-E-Mail und muss seinen Account selbst aktivieren.</p>}
+        {!dbAdmin&&<p style={{fontSize:12,color:'#888',background:'#f0f0f0',borderRadius:8,padding:'10px 12px',margin:'0 0 12px',lineHeight:1.5}}>ℹ Kein Service-Key konfiguriert — der neue Benutzer erhält eine Bestätigungs-E-Mail und muss seinen Account selbst aktivieren.</p>}
         {err&&<p style={{color:'#e53e3e',fontSize:13,margin:'4px 0 12px'}}>{err}</p>}
         <div style={{display:'flex',gap:10}}>
-          <button type="submit" className="nfg-btn-primary" disabled={saving}>{saving?'Erstellen…':'User erstellen'}</button>
+          <button type="submit" className="nfg-btn-primary" disabled={saving}>{saving?'Erstellen…':'Benutzer erstellen'}</button>
           <button type="button" className="nfg-btn-ghost" onClick={onClose}>Abbrechen</button>
         </div>
       </form>
@@ -1773,31 +1776,30 @@ function UserCreateModal({onClose,onSave}) {
   </div>;
 }
 
-// ── Verwalten — User tab ────────────────────────────────────────
+// ── Benutzerverwaltung ─────────────────────────────────────────
 function UserTab({currentUserId}) {
   const [users,setUsers]=useState([]);
   const [loading,setLoading]=useState(true);
+  const [search,setSearch]=useState('');
   const [confirmDel,setConfirmDel]=useState(null);
   const [deleting,setDeleting]=useState(false);
-  const [toggling,setToggling]=useState(null);
   const [showCreate,setShowCreate]=useState(false);
   const [editUser,setEditUser]=useState(null);
+  const [resetSuccess,setResetSuccess]=useState(null);
+  const [actionLoading,setActionLoading]=useState(null); // user id being acted on
 
   const reload=()=>{
     setLoading(true);
-    db.from('user_profiles').select('*').order('created_at',{ascending:false})
+    db.from('user_profiles').select('*').order('name',{ascending:true})
       .then(({data})=>{ setUsers(data||[]); setLoading(false); });
   };
-
   useEffect(()=>{ reload(); },[]);
 
-  const toggleRole=async u=>{
-    setToggling(u.id);
-    const newRole=u.role==='admin'?'user':'admin';
-    const{error}=await db.from('user_profiles').update({role:newRole}).eq('id',u.id);
-    if(!error) setUsers(prev=>prev.map(x=>x.id===u.id?{...x,role:newRole}:x));
-    setToggling(null);
-  };
+  const filtered=useMemo(()=>{
+    const q=search.toLowerCase();
+    if(!q) return users;
+    return users.filter(u=>(u.name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q));
+  },[users,search]);
 
   const handleEdit=async(id,{name,role})=>{
     const{data,error}=await db.from('user_profiles').update({name,role}).eq('id',id).select();
@@ -1810,75 +1812,203 @@ function UserTab({currentUserId}) {
   const handleCreate=async({email,password,name,role})=>{
     let uid=null;
     if(dbAdmin){
-      // Service-Key vorhanden: User direkt anlegen, E-Mail-Bestätigung überspringen
       const{data,error}=await dbAdmin.auth.admin.createUser({
         email,password,user_metadata:{name},email_confirm:true
       });
       if(error) return error.message;
       uid=data.user.id;
+      // Profil mit email & Rolle sicherstellen
+      await dbAdmin.from('user_profiles').upsert({id:uid,name,email,role,is_blocked:false});
     } else {
-      // Fallback: signUp — User erhält Bestätigungs-E-Mail
       const{data,error}=await db.auth.signUp({email,password,options:{data:{name}}});
       if(error) return error.message;
       uid=data?.user?.id||null;
-    }
-    // Profil-Rolle setzen (Trigger legt Profil mit role='user' an — hier ggf. auf 'admin' aktualisieren)
-    if(uid && role==='admin'){
-      await db.from('user_profiles').update({role:'admin'}).eq('id',uid);
+      if(uid && role==='admin') await db.from('user_profiles').update({role:'admin'}).eq('id',uid);
     }
     reload();
     return null;
   };
 
+  const handleToggleBlock=async u=>{
+    const newVal=!u.is_blocked;
+    setActionLoading(u.id);
+    await db.from('user_profiles').update({is_blocked:newVal}).eq('id',u.id);
+    setUsers(prev=>prev.map(x=>x.id===u.id?{...x,is_blocked:newVal}:x));
+    setActionLoading(null);
+  };
+
+  const handleResetPassword=async u=>{
+    setActionLoading(u.id+'_reset');
+    const{error}=await db.auth.resetPasswordForEmail(u.email,{
+      redirectTo: window.location.origin
+    });
+    setActionLoading(null);
+    if(!error){
+      setResetSuccess(u.email);
+      setTimeout(()=>setResetSuccess(null),4000);
+    }
+  };
+
   const handleDelete=async id=>{
     setDeleting(true);
-    // Profil löschen (cascadiert zu saved_items, kommentare via FK oder manuell)
     await db.from('user_profiles').delete().eq('id',id);
-    // Auth-Datensatz löschen — nur möglich wenn Service-Key konfiguriert
     if(dbAdmin) await dbAdmin.auth.admin.deleteUser(id);
     setUsers(prev=>prev.filter(x=>x.id!==id));
     setDeleting(false); setConfirmDel(null);
   };
 
+  const RoleBadge=({role})=>role==='admin'
+    ?<span style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 8px',borderRadius:12,fontSize:11,fontWeight:700,background:'#1a1a1a',color:'#d2dc46'}}>Admin</span>
+    :<span style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 8px',borderRadius:12,fontSize:11,fontWeight:600,background:'#f0f0f0',color:'#555'}}>Benutzer</span>;
+
+  const StatusBadge=({blocked})=>blocked
+    ?<span style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 8px',borderRadius:12,fontSize:11,fontWeight:600,background:'#fee2e2',color:'#b91c1c'}}>🔒 Gesperrt</span>
+    :<span style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 8px',borderRadius:12,fontSize:11,fontWeight:600,background:'#dcfce7',color:'#166534'}}>✓ Aktiv</span>;
+
   return <>
-    <div className="nfg-admin-bar">
-      <p className="nfg-page-sub" style={{margin:0}}>{users.length} registrierte User</p>
-      <button className="nfg-btn-primary" onClick={()=>setShowCreate(true)}>+ Neuer User</button>
+    {/* Reset-Success-Banner */}
+    {resetSuccess&&<div style={{marginBottom:12,padding:'10px 14px',borderRadius:8,background:'#dcfce7',border:'1px solid #bbf7d0',fontSize:13,color:'#166534'}}>
+      ✓ Passwort-Reset-Link wurde an <strong>{resetSuccess}</strong> gesendet.
+    </div>}
+
+    {/* Toolbar */}
+    <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16,flexWrap:'wrap'}}>
+      <div style={{position:'relative',flex:'1',minWidth:200}}>
+        <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'#aaa',fontSize:14}}>🔍</span>
+        <input
+          value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder="Name oder E-Mail suchen…"
+          style={{width:'100%',paddingLeft:32,paddingRight:12,paddingTop:8,paddingBottom:8,border:'1px solid #d1d5db',borderRadius:8,fontSize:13,outline:'none',boxSizing:'border-box'}}
+        />
+      </div>
+      <button className="nfg-btn-primary" style={{whiteSpace:'nowrap'}} onClick={()=>setShowCreate(true)}>+ Neuer Benutzer</button>
     </div>
+
+    {/* Stats */}
+    <div style={{fontSize:12,color:'#888',marginBottom:12}}>
+      {users.length} Benutzer · {users.filter(u=>u.role==='admin').length} Admin(s) · {users.filter(u=>u.is_blocked).length} gesperrt
+    </div>
+
     {loading&&<div style={{padding:'32px 0',textAlign:'center',color:'#666'}}>Laden…</div>}
-    {!loading&&users.length===0&&<div className="nfg-empty">Noch keine User registriert.</div>}
-    <div className="nfg-admin-list">
-      {users.map(u=>{
-        const isSelf=u.id===currentUserId;
-        const isAdm=u.role==='admin';
-        return <div key={u.id} className="nfg-admin-item">
-          <div className="nfg-avatar" style={{width:32,height:32,fontSize:13,flexShrink:0}}>{(u.name||'?').charAt(0).toUpperCase()}</div>
-          <div className="nfg-admin-info">
-            <div className="nfg-admin-name">
-              {u.name||'—'}
-              {isSelf&&<span style={{marginLeft:8,fontSize:11,background:'#e0e0e0',borderRadius:4,padding:'1px 6px',fontWeight:600}}>Du</span>}
-              <span style={{marginLeft:8,fontSize:11,borderRadius:4,padding:'1px 6px',fontWeight:600,background:isAdm?'#000':'#f0f0f0',color:isAdm?'#d2dc46':'#666'}}>{isAdm?'Admin':'User'}</span>
+
+    {!loading&&filtered.length===0&&<div className="nfg-empty">
+      {search?'Keine Benutzer gefunden.':'Noch keine Benutzer registriert.'}
+    </div>}
+
+    {/* Tabelle Desktop / Cards Mobile */}
+    {!loading&&filtered.length>0&&<>
+      {/* Desktop-Tabelle */}
+      <div style={{display:'none'}} className="nfg-user-table-wrap">
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+          <thead>
+            <tr style={{background:'#f9fafb',borderBottom:'1px solid #e5e7eb'}}>
+              <th style={{textAlign:'left',padding:'10px 14px',fontWeight:600,fontSize:11,textTransform:'uppercase',letterSpacing:'.05em',color:'#6b7280'}}>Name / E-Mail</th>
+              <th style={{textAlign:'left',padding:'10px 14px',fontWeight:600,fontSize:11,textTransform:'uppercase',letterSpacing:'.05em',color:'#6b7280'}}>Registriert</th>
+              <th style={{textAlign:'left',padding:'10px 14px',fontWeight:600,fontSize:11,textTransform:'uppercase',letterSpacing:'.05em',color:'#6b7280'}}>Rolle</th>
+              <th style={{textAlign:'left',padding:'10px 14px',fontWeight:600,fontSize:11,textTransform:'uppercase',letterSpacing:'.05em',color:'#6b7280'}}>Status</th>
+              <th style={{padding:'10px 14px'}}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(u=>{
+              const isSelf=u.id===currentUserId;
+              return <tr key={u.id} style={{borderBottom:'1px solid #f3f4f6'}}>
+                <td style={{padding:'12px 14px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <div style={{width:32,height:32,borderRadius:'50%',background:'#eef2ff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,color:'#4338ca',flexShrink:0}}>
+                      {(u.name||'?').charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{fontWeight:600,color:'#111'}}>
+                        {u.name||'—'}
+                        {isSelf&&<span style={{marginLeft:6,fontSize:10,background:'#e5e7eb',borderRadius:4,padding:'1px 5px',fontWeight:600,color:'#374151'}}>Du</span>}
+                      </div>
+                      <div style={{fontSize:11,color:'#9ca3af'}}>{u.email||'—'}</div>
+                    </div>
+                  </div>
+                </td>
+                <td style={{padding:'12px 14px',color:'#6b7280',whiteSpace:'nowrap'}}>{fmtDate(u.created_at)}</td>
+                <td style={{padding:'12px 14px'}}><RoleBadge role={u.role}/></td>
+                <td style={{padding:'12px 14px'}}><StatusBadge blocked={u.is_blocked}/></td>
+                <td style={{padding:'12px 14px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,justifyContent:'flex-end'}}>
+                    <button onClick={()=>handleResetPassword(u)} disabled={actionLoading===u.id+'_reset'} title="Passwort-Reset senden"
+                      style={{padding:'5px 8px',border:'1px solid #fbbf24',borderRadius:6,background:'#fffbeb',color:'#d97706',cursor:'pointer',fontSize:13}}>
+                      {actionLoading===u.id+'_reset'?'…':'🔑'}
+                    </button>
+                    <button onClick={()=>!isSelf&&handleToggleBlock(u)} disabled={isSelf||actionLoading===u.id} title={u.is_blocked?'Entsperren':'Sperren'}
+                      style={{padding:'5px 8px',border:`1px solid ${u.is_blocked?'#bbf7d0':'#fecaca'}`,borderRadius:6,background:u.is_blocked?'#f0fdf4':'#fff5f5',color:u.is_blocked?'#166534':'#dc2626',cursor:isSelf?'not-allowed':'pointer',opacity:isSelf?0.4:1,fontSize:13}}>
+                      {actionLoading===u.id?'…':u.is_blocked?'🔓':'🔒'}
+                    </button>
+                    <button onClick={()=>setEditUser(u)} title="Bearbeiten"
+                      style={{padding:'5px 8px',border:'1px solid #bfdbfe',borderRadius:6,background:'#eff6ff',color:'#2563eb',cursor:'pointer',fontSize:13}}>✏️</button>
+                    <button onClick={()=>!isSelf&&setConfirmDel(u)} disabled={isSelf} title={isSelf?'Eigenen Account nicht löschbar':'Löschen'}
+                      style={{padding:'5px 8px',border:'1px solid #fecaca',borderRadius:6,background:'#fff5f5',color:'#dc2626',cursor:isSelf?'not-allowed':'pointer',opacity:isSelf?0.4:1,fontSize:13}}>🗑</button>
+                  </div>
+                </td>
+              </tr>;
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile Cards */}
+      <div className="nfg-admin-list" style={{marginTop:0}}>
+        {filtered.map(u=>{
+          const isSelf=u.id===currentUserId;
+          return <div key={u.id} className="nfg-admin-item" style={{flexDirection:'column',alignItems:'flex-start',gap:10}}>
+            <div style={{display:'flex',alignItems:'center',gap:10,width:'100%'}}>
+              <div style={{width:36,height:36,borderRadius:'50%',background:'#eef2ff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:700,color:'#4338ca',flexShrink:0}}>
+                {(u.name||'?').charAt(0).toUpperCase()}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:700,fontSize:14,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                  {u.name||'—'}
+                  {isSelf&&<span style={{fontSize:10,background:'#e5e7eb',borderRadius:4,padding:'1px 5px',fontWeight:600,color:'#374151'}}>Du</span>}
+                </div>
+                <div style={{fontSize:11,color:'#9ca3af',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.email||'—'}</div>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
+                <RoleBadge role={u.role}/>
+                <StatusBadge blocked={u.is_blocked}/>
+              </div>
             </div>
-            <div className="nfg-admin-meta">Registriert: {fmtDate(u.created_at)}</div>
-          </div>
-          <div className="nfg-admin-actions">
-            <button className="nfg-btn-sm nfg-btn-sm-edit" onClick={()=>setEditUser(u)}>Bearbeiten</button>
-            <button className="nfg-btn-sm nfg-btn-sm-del" disabled={isSelf} title={isSelf?'Eigenen Account nicht löschbar':''} onClick={()=>!isSelf&&setConfirmDel(u)}>Löschen</button>
-          </div>
-        </div>;
-      })}
-    </div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',paddingTop:8,borderTop:'1px solid #f3f4f6'}}>
+              <span style={{fontSize:11,color:'#9ca3af'}}>{fmtDate(u.created_at)}</span>
+              <div style={{display:'flex',gap:6}}>
+                <button onClick={()=>handleResetPassword(u)} disabled={actionLoading===u.id+'_reset'} title="Passwort-Reset senden"
+                  style={{padding:'5px 8px',border:'1px solid #fbbf24',borderRadius:6,background:'#fffbeb',color:'#d97706',cursor:'pointer',fontSize:13}}>
+                  {actionLoading===u.id+'_reset'?'…':'🔑'}
+                </button>
+                <button onClick={()=>!isSelf&&handleToggleBlock(u)} disabled={isSelf||actionLoading===u.id} title={u.is_blocked?'Entsperren':'Sperren'}
+                  style={{padding:'5px 8px',border:`1px solid ${u.is_blocked?'#bbf7d0':'#fecaca'}`,borderRadius:6,background:u.is_blocked?'#f0fdf4':'#fff5f5',color:u.is_blocked?'#166534':'#dc2626',cursor:isSelf?'not-allowed':'pointer',opacity:isSelf?0.4:1,fontSize:13}}>
+                  {actionLoading===u.id?'…':u.is_blocked?'🔓':'🔒'}
+                </button>
+                <button onClick={()=>setEditUser(u)} title="Bearbeiten"
+                  style={{padding:'5px 8px',border:'1px solid #bfdbfe',borderRadius:6,background:'#eff6ff',color:'#2563eb',cursor:'pointer',fontSize:13}}>✏️</button>
+                <button onClick={()=>!isSelf&&setConfirmDel(u)} disabled={isSelf} title={isSelf?'Eigenen Account nicht löschbar':'Löschen'}
+                  style={{padding:'5px 8px',border:'1px solid #fecaca',borderRadius:6,background:'#fff5f5',color:'#dc2626',cursor:isSelf?'not-allowed':'pointer',opacity:isSelf?0.4:1,fontSize:13}}>🗑</button>
+              </div>
+            </div>
+          </div>;
+        })}
+      </div>
+    </>}
+
     {editUser&&<UserEditModal user={editUser} isSelf={editUser.id===currentUserId} onClose={()=>setEditUser(null)} onSave={handleEdit}/>}
     {showCreate&&<UserCreateModal onClose={()=>setShowCreate(false)} onSave={handleCreate}/>}
+
+    {/* Löschen-Bestätigung */}
     {confirmDel&&<div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&setConfirmDel(null)}>
       <div className="nfg-form-sheet" style={{maxWidth:420}}>
-        <h3 style={{margin:'0 0 12px',fontSize:20,fontWeight:700}}>User löschen?</h3>
-        <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>
-          „{confirmDel.name}" wird gelöscht.
-          {!dbAdmin&&<><br/><br/><span style={{color:'#b45309'}}>⚠ Kein Service-Key konfiguriert — nur das Profil wird gelöscht. Den Auth-Datensatz bitte im Supabase Dashboard entfernen (Authentication → Users).</span></>}
-        </p>
+        <h3 style={{margin:'0 0 8px',fontSize:18,fontWeight:700}}>Benutzer löschen?</h3>
+        <p style={{margin:'0 0 8px',color:'#374151',fontSize:14}}>„{confirmDel.name}" ({confirmDel.email||'keine E-Mail'}) wird dauerhaft gelöscht.</p>
+        {!dbAdmin&&<p style={{margin:'0 0 20px',color:'#b45309',fontSize:12,background:'#fffbeb',borderRadius:6,padding:'8px 12px'}}>
+          ⚠ Kein Service-Key konfiguriert — nur das Profil wird gelöscht. Den Auth-Datensatz bitte im Supabase Dashboard entfernen (Authentication → Users).
+        </p>}
+        {dbAdmin&&<p style={{margin:'0 0 20px',color:'#666',fontSize:13}}/>}
         <div style={{display:'flex',gap:10}}>
-          <button className="nfg-btn-primary" style={{background:'#e53e3e',borderColor:'#e53e3e',color:'#fff'}} disabled={deleting} onClick={()=>handleDelete(confirmDel.id)}>
+          <button className="nfg-btn-primary" style={{background:'#dc2626',borderColor:'#dc2626',color:'#fff'}} disabled={deleting} onClick={()=>handleDelete(confirmDel.id)}>
             {deleting?'Löschen…':'Endgültig löschen'}
           </button>
           <button className="nfg-btn-ghost" onClick={()=>setConfirmDel(null)}>Abbrechen</button>
@@ -2776,13 +2906,18 @@ function CrmKontakteTab({events}) {
 
 function CrmTab({events}){
   const [subTab,setSubTab]=useState('kontakte');
+  const [currentUserId,setCurrentUserId]=useState(null);
+  useEffect(()=>{
+    db.auth.getUser().then(({data})=>setCurrentUserId(data?.user?.id||null));
+  },[]);
   const tabs=[
-    {id:'kontakte',  label:'Kontakte',    icon:'👤'},
-    {id:'unternehmen',label:'Unternehmen',icon:'🏢'},
-    {id:'aktivitaeten',label:'Aktivitäten',icon:'📋'}
+    {id:'kontakte',    label:'Kontakte',    icon:'👤'},
+    {id:'unternehmen', label:'Unternehmen', icon:'🏢'},
+    {id:'aktivitaeten',label:'Aktivitäten', icon:'📋'},
+    {id:'benutzer',    label:'Benutzer',    icon:'⚙️'}
   ];
   return <div>
-    <div style={{display:'flex',gap:4,marginBottom:24,borderBottom:'2px solid var(--nfg-line)',paddingBottom:0}}>
+    <div style={{display:'flex',gap:4,marginBottom:24,borderBottom:'2px solid var(--nfg-line)',paddingBottom:0,flexWrap:'wrap'}}>
       {tabs.map(t=><button key={t.id} onClick={()=>setSubTab(t.id)} style={{
         padding:'10px 18px',fontSize:13,fontWeight:700,border:'none',background:'none',cursor:'pointer',
         borderBottom:subTab===t.id?'2.5px solid #1a1a1a':'2.5px solid transparent',
@@ -2792,6 +2927,7 @@ function CrmTab({events}){
     {subTab==='kontakte'    &&<CrmKontakteTab events={events}/>}
     {subTab==='unternehmen' &&<CrmUnternehmenTab/>}
     {subTab==='aktivitaeten'&&<CrmAktivitaetenTab/>}
+    {subTab==='benutzer'    &&<UserTab currentUserId={currentUserId}/>}
   </div>;
 }
 
