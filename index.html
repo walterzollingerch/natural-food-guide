@@ -1823,7 +1823,11 @@ function UserTab({currentUserId}) {
       const{data,error}=await db.auth.signUp({email,password,options:{data:{name}}});
       if(error) return error.message;
       uid=data?.user?.id||null;
-      if(uid && role==='admin') await db.from('user_profiles').update({role:'admin'}).eq('id',uid);
+      if(uid){
+        const upd={is_blocked:false};
+        if(role==='admin') upd.role='admin';
+        await db.from('user_profiles').update(upd).eq('id',uid);
+      }
     }
     reload();
     return null;
