@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
-<title>Natural Food Guide — by Soil to Soul</title>
+<title>Soil to Soul — Mgt Tool</title>
 <style>
 :root {
   --nfg-bg: #f5f5f5; --nfg-bg-card: #ffffff; --nfg-ink: #000;
@@ -586,11 +586,11 @@ INSERT INTO translations (key,page,de,en) VALUES
 ('merkliste.register','merkliste','Konto erstellen','Create Account'),
 ('merkliste.empty','merkliste','Noch nichts gespeichert. Im Guide Einträge mit ♡ markieren.','Nothing saved yet. Mark entries with ♡ in the Guide.'),
 ('mehr.title','mehr','Mehr','More'),
-('mehr.about_title','mehr','Was ist der Natural Food Guide?','What is the Natural Food Guide?'),
+('mehr.about_title','mehr','Was ist der Soil to Soul?','What is the Soil to Soul?'),
 ('mehr.about_text','mehr','Ein kuratierter Guide für Restaurants, Verarbeiter:innen, Höfe, Läden sowie Pop-Ups & Events in der Schweiz, die mit Boden, Saison und Herkunft konsequent umgehen.','A curated guide to restaurants, producers, farms, shops, pop-ups & events in Switzerland that prioritize soil, seasonality, and origin.'),
 ('mehr.about_link','mehr','Über uns →','About us →'),
 ('mehr.criteria_title','mehr','Bewertungskriterien','Rating Criteria'),
-('mehr.criteria_intro','mehr','Restaurants im Natural Food Guide werden nach einem transparenten Kriterienkatalog bewertet. Die Bewertung erfolgt in den Kategorien «Küche» und «Restaurant & Betrieb».','Restaurants in the Natural Food Guide are assessed using a transparent criteria catalogue in the categories "Kitchen" and "Restaurant & Operations".'),
+('mehr.criteria_intro','mehr','Restaurants im Soil to Soul werden nach einem transparenten Kriterienkatalog bewertet. Die Bewertung erfolgt in den Kategorien «Küche» und «Restaurant & Betrieb».','Restaurants in the Soil to Soul are assessed using a transparent criteria catalogue in the categories "Kitchen" and "Restaurant & Operations".'),
 ('mehr.magazine_title','mehr','Magazin','Magazine'),
 ('mehr.events_title','mehr','Eventkalender','Event Calendar'),
 ('mehr.no_magazine','mehr','Noch keine Beiträge.','No articles yet.'),
@@ -770,7 +770,7 @@ function SetupScreen() {
   return <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',padding:24,background:'#f5f5f5',fontFamily:'system-ui'}}>
     <div style={{maxWidth:560,background:'#fff',borderRadius:20,border:'2px solid #000',padding:40}}>
       <div style={{fontSize:11,fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',color:'#666',marginBottom:8}}>Datenbank einrichten</div>
-      <div style={{fontSize:28,fontWeight:700,marginBottom:4}}>Natural Food Guide</div>
+      <div style={{fontSize:28,fontWeight:700,marginBottom:4}}>Soil to Soul</div>
       <div style={{fontSize:14,color:'#666',marginBottom:32}}>Diese App benötigt eine Supabase-Datenbank.</div>
       <div style={{display:'flex',flexDirection:'column',gap:20,marginBottom:32}}>
         <Step n={1} title="Kostenloses Konto erstellen">Gehe zu <b>supabase.com</b> und erstelle ein neues Projekt.</Step>
@@ -837,7 +837,7 @@ function AuthModal({mode='login',hint,onClose,onAuth}) {
         <span style={{fontSize:16}}>🔒</span>{hint}
       </div>}
       <h2 style={{margin:'0 0 4px',fontSize:26,fontWeight:700}}>{view==='login'?t('auth.login_title','Anmelden'):t('auth.register_title','Registrieren')}</h2>
-      <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>Natural Food Guide · Soil to Soul</p>
+      <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>Soil to Soul · Mgt Tool</p>
       <form onSubmit={view==='login'?doLogin:doRegister} style={{display:'flex',flexDirection:'column',gap:14}}>
         {view==='register'&&<label className="nfg-label">{t('auth.name','Name')}<input {...inp} value={name} onChange={e=>setName(e.target.value)} required placeholder="Maria Muster"/></label>}
         <label className="nfg-label">{t('auth.email','E-Mail')}<input {...inp} type="email" value={email} onChange={e=>setEmail(e.target.value)} required placeholder="maria@example.ch"/></label>
@@ -861,8 +861,8 @@ function Sidebar({tab,setTab,user,userRole,onAuth,onLogout}) {
   const isAdmin=userRole==='admin';
   return <aside className="nfg-sidebar">
     <div className="nfg-sidebar-brand">
-      <div className="nfg-sidebar-by">by Soil to Soul</div>
-      <div className="nfg-sidebar-ttl">Stammdaten</div>
+      <img src="https://sotoso.org/assets/img/logo.svg" alt="Soil to Soul" style={{height:32,marginBottom:6,filter:'brightness(0) invert(1)'}}/>
+      <div className="nfg-sidebar-ttl" style={{fontSize:13,fontWeight:600,letterSpacing:'0.05em',opacity:0.7}}>Mgt Tool</div>
     </div>
     <nav>
       <button className={'nfg-sidebar-btn'+(tab==='start'?' on':'')} onClick={()=>setTab('start')}>
@@ -1133,7 +1133,7 @@ function GuidePage({listings,saved,onSave,onOpen,onLike,likeCounts,myLikes}) {
   return <>
     <header className="nfg-hd">
       <div className="nfg-hd-top">
-        <div className="nfg-hd-ttl">Natural Food Guide</div>
+        <div className="nfg-hd-ttl">Soil to Soul</div>
         <button className="nfg-lang" onClick={()=>setLocale(locale==='DE'?'EN':'DE')}>{locale}</button>
       </div>
       <div className="nfg-search">
@@ -1199,10 +1199,10 @@ function MehrPage({events,magazine,onTrack}) {
       </div>
     </header>
     <div className="nfg-page"><div className="nfg-mehr-grid">
-      <section className="nfg-more-card full"><h3 className="nfg-more-h">{t('mehr.about_title','Was ist der Natural Food Guide?')}</h3><p>{t('mehr.about_text','Ein kuratierter Guide für Restaurants, Verarbeiter:innen, Höfe, Läden sowie Pop-Ups & Events in der Schweiz, die mit Boden, Saison und Herkunft konsequent umgehen.')}</p><a href="#" className="nfg-link">{t('mehr.about_link','Über uns →')}</a></section>
+      <section className="nfg-more-card full"><h3 className="nfg-more-h">{t('mehr.about_title','Was ist der Soil to Soul?')}</h3><p>{t('mehr.about_text','Ein kuratierter Guide für Restaurants, Verarbeiter:innen, Höfe, Läden sowie Pop-Ups & Events in der Schweiz, die mit Boden, Saison und Herkunft konsequent umgehen.')}</p><a href="#" className="nfg-link">{t('mehr.about_link','Über uns →')}</a></section>
       <section className="nfg-more-card full" id="kriterien">
         <h3 className="nfg-more-h">{t('mehr.criteria_title','Bewertungskriterien')}</h3>
-        <p>{t('mehr.criteria_intro','Restaurants im Natural Food Guide werden nach einem transparenten Kriterienkatalog bewertet. Die Bewertung erfolgt in den Kategorien «Küche» und «Restaurant & Betrieb».')}</p>
+        <p>{t('mehr.criteria_intro','Restaurants im Soil to Soul werden nach einem transparenten Kriterienkatalog bewertet. Die Bewertung erfolgt in den Kategorien «Küche» und «Restaurant & Betrieb».')}</p>
         <div className="nfg-pts-legend">
           <div className="nfg-pts-legend-row"><b>3 Punkte:</b><span>{t('mehr.pts_3','wird grösstenteils eingehalten')}</span></div>
           <div className="nfg-pts-legend-row"><b>2 Punkte:</b><span>{t('mehr.pts_2','wird mehrheitlich eingehalten, bis auf wenige Ausnahmen')}</span></div>
