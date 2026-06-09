@@ -2372,15 +2372,15 @@ function KatBadge({katId,kategorien}) {
   return <span style={{fontSize:11,fontWeight:700,padding:'2px 9px',borderRadius:999,background:color+'22',color,border:`1.5px solid ${color}55`,whiteSpace:'nowrap'}}>{kat.name}</span>;
 }
 
-const EMPTY_CRM={vorname:'',nachname:'',funktion:'',firma:'',email:'',telefon:'',linkedin:'',social_media:'',kategorie_id:'',notizen:'',einwilligung:false,einwilligung_datum:''};
+const EMPTY_CRM={vorname:'',nachname:'',funktion:'',firma:'',email:'',telefon:'',linkedin:'',social_media:'',kategorie_id:'',unternehmen_id:'',notizen:'',einwilligung:false,einwilligung_datum:''};
 
-function CrmKontaktFormModal({initial,kategorien,onClose,onSave}) {
+function CrmKontaktFormModal({initial,kategorien,unternehmen=[],onClose,onSave}) {
   const [f,setF]=useState(()=>initial?{
     vorname:initial.vorname||'',nachname:initial.nachname||'',funktion:initial.funktion||'',
     firma:initial.firma||'',email:initial.email||'',telefon:initial.telefon||'',
     linkedin:initial.linkedin||'',social_media:initial.social_media||'',
-    kategorie_id:initial.kategorie_id||'',notizen:initial.notizen||'',
-    einwilligung:!!initial.einwilligung,einwilligung_datum:initial.einwilligung_datum||''
+    kategorie_id:initial.kategorie_id||'',unternehmen_id:initial.unternehmen_id||'',
+    notizen:initial.notizen||'',einwilligung:!!initial.einwilligung,einwilligung_datum:initial.einwilligung_datum||''
   }:{...EMPTY_CRM});
   const [err,setErr]=useState('');
   const [saving,setSaving]=useState(false);
@@ -2395,8 +2395,8 @@ function CrmKontaktFormModal({initial,kategorien,onClose,onSave}) {
       funktion:f.funktion.trim()||null,firma:f.firma.trim()||null,
       email:f.email.trim()||null,telefon:f.telefon.trim()||null,
       linkedin:f.linkedin.trim()||null,social_media:f.social_media.trim()||null,
-      kategorie_id:f.kategorie_id||null,notizen:f.notizen.trim()||null,
-      einwilligung:f.einwilligung,einwilligung_datum:f.einwilligung_datum||null
+      kategorie_id:f.kategorie_id||null,unternehmen_id:f.unternehmen_id||null,
+      notizen:f.notizen.trim()||null,einwilligung:f.einwilligung,einwilligung_datum:f.einwilligung_datum||null
     };
     const errMsg=await onSave(payload,!!initial);
     setSaving(false);
@@ -2418,11 +2418,17 @@ function CrmKontaktFormModal({initial,kategorien,onClose,onSave}) {
           <label className="nfg-label">Funktion / Position<input {...inp} value={f.funktion} onChange={e=>set('funktion',e.target.value)} placeholder="Redaktorin"/></label>
           <label className="nfg-label">Firma / Organisation<input {...inp} value={f.firma} onChange={e=>set('firma',e.target.value)} placeholder="NZZ"/></label>
         </div>
-        <div className="nfg-form-row one">
+        <div className="nfg-form-row">
           <label className="nfg-label">Kategorie
             <select className="nfg-select" style={{width:'100%'}} value={f.kategorie_id} onChange={e=>set('kategorie_id',e.target.value)}>
               <option value="">— keine —</option>
               {kategorien.map(k=><option key={k.id} value={k.id}>{k.name}</option>)}
+            </select>
+          </label>
+          <label className="nfg-label">Unternehmen
+            <select className="nfg-select" style={{width:'100%'}} value={f.unternehmen_id} onChange={e=>set('unternehmen_id',e.target.value)}>
+              <option value="">— keines —</option>
+              {unternehmen.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </label>
         </div>
@@ -2543,7 +2549,7 @@ function CrmKontaktDetail({contact,kategorien,events,currentUserId,onClose,onEdi
           <div>
             {contact.kategorie_id&&<KatBadge katId={contact.kategorie_id} kategorien={kategorien}/>}
             <h1 className="nfg-profile-name" style={{marginTop:8,marginBottom:4}}>{contactName}</h1>
-            {(contact.funktion||contact.firma)&&<div style={{fontSize:14,color:'#666'}}>{[contact.funktion,contact.firma].filter(Boolean).join(' · ')}</div>}
+            {(contact.funktion||contact.firma||contact.unternehmen_name)&&<div style={{fontSize:14,color:'#666'}}>{[contact.funktion,contact.unternehmen_name||contact.firma].filter(Boolean).join(' · ')}</div>}
           </div>
           <div style={{display:'flex',gap:6,flexShrink:0}}>
             <button className="nfg-btn-sm nfg-btn-sm-edit" onClick={()=>onEdit(contact)}>Bearbeiten</button>
@@ -2611,7 +2617,7 @@ function CrmKontaktDetail({contact,kategorien,events,currentUserId,onClose,onEdi
   </div>;
 }
 
-function CrmTab({events}) {
+function CrmKontakteTab({events}) {
   const [contacts,setContacts]=useState([]);
   const [kategorien,setKategorien]=useState([]);
   const [loading,setLoading]=useState(true);
@@ -2622,6 +2628,11 @@ function CrmTab({events}) {
   const [confirmDel,setConfirmDel]=useState(null);
   const [deleting,setDeleting]=useState(false);
   const [currentUserId,setCurrentUserId]=useState(null);
+  const [unternehmen,setUnternehmen]=useState([]);
+
+  useEffect(()=>{
+    db.from('crm_unternehmen').select('id,name').order('name').then(({data})=>setUnternehmen(data||[]));
+  },[]);
 
   const reload=()=>{
     db.from('crm_contacts_overview').select('*').order('nachname')
@@ -2722,7 +2733,7 @@ function CrmTab({events}) {
       })}
     </div>
 
-    {formItem!==null&&<CrmKontaktFormModal initial={formItem||null} kategorien={kategorien} onClose={()=>setFormItem(null)} onSave={handleSave}/>}
+    {formItem!==null&&<CrmKontaktFormModal initial={formItem||null} kategorien={kategorien} unternehmen={unternehmen} onClose={()=>setFormItem(null)} onSave={handleSave}/>}
 
     {detail&&<CrmKontaktDetail
       contact={detail} kategorien={kategorien} events={events} currentUserId={currentUserId}
@@ -2741,6 +2752,584 @@ function CrmTab({events}) {
         </div>
       </div>
     </div>}
+  </>;
+}
+
+function CrmTab({events}){
+  const [subTab,setSubTab]=useState('kontakte');
+  const tabs=[
+    {id:'kontakte',  label:'Kontakte',    icon:'👤'},
+    {id:'unternehmen',label:'Unternehmen',icon:'🏢'},
+    {id:'aktivitaeten',label:'Aktivitäten',icon:'📋'}
+  ];
+  return <div>
+    <div style={{display:'flex',gap:4,marginBottom:24,borderBottom:'2px solid var(--nfg-line)',paddingBottom:0}}>
+      {tabs.map(t=><button key={t.id} onClick={()=>setSubTab(t.id)} style={{
+        padding:'10px 18px',fontSize:13,fontWeight:700,border:'none',background:'none',cursor:'pointer',
+        borderBottom:subTab===t.id?'2.5px solid #1a1a1a':'2.5px solid transparent',
+        color:subTab===t.id?'#1a1a1a':'#888',marginBottom:-2,display:'flex',alignItems:'center',gap:6
+      }}>{t.icon} {t.label}</button>)}
+    </div>
+    {subTab==='kontakte'    &&<CrmKontakteTab events={events}/>}
+    {subTab==='unternehmen' &&<CrmUnternehmenTab/>}
+    {subTab==='aktivitaeten'&&<CrmAktivitaetenTab/>}
+  </div>;
+}
+
+// ── CRM Unternehmen ────────────────────────────────────────────
+const AKT_TYP={
+  event:       {label:'Event',       icon:'🎟', color:'#8b5cf6'},
+  kooperation: {label:'Kooperation', icon:'🤝', color:'#f59e0b'},
+  messe:       {label:'Messe',       icon:'🏛',  color:'#3b82f6'},
+  workshop:    {label:'Workshop',    icon:'🛠',  color:'#10b981'},
+  kampagne:    {label:'Kampagne',    icon:'📣', color:'#ef4444'},
+  sonstiges:   {label:'Sonstiges',  icon:'📌', color:'#6b7280'}
+};
+const AKT_STATUS={
+  geplant:      {label:'Geplant',      bg:'#eff6ff', color:'#1d4ed8'},
+  aktiv:        {label:'Aktiv',        bg:'#dcfce7', color:'#166534'},
+  abgeschlossen:{label:'Abgeschlossen',bg:'#f3f4f6', color:'#374151'},
+  abgesagt:     {label:'Abgesagt',     bg:'#fee2e2', color:'#b91c1c'}
+};
+
+function AktBadge({status}){
+  const s=AKT_STATUS[status]||AKT_STATUS.geplant;
+  return <span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:999,background:s.bg,color:s.color}}>{s.label}</span>;
+}
+
+// ── CRM Unternehmen Form Modal ─────────────────────────────────
+const EMPTY_UNT={name:'',branche:'',website:'',adresse:'',plz:'',ort:'',land:'CH',telefon:'',email:'',notizen:''};
+function CrmUnternehmenFormModal({initial,onClose,onSave}){
+  const [f,setF]=useState(()=>initial?{
+    name:initial.name||'',branche:initial.branche||'',website:initial.website||'',
+    adresse:initial.adresse||'',plz:initial.plz||'',ort:initial.ort||'',
+    land:initial.land||'CH',telefon:initial.telefon||'',email:initial.email||'',
+    notizen:initial.notizen||''
+  }:{...EMPTY_UNT});
+  const [err,setErr]=useState('');
+  const [saving,setSaving]=useState(false);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const submit=async e=>{
+    e.preventDefault(); setErr('');
+    if(!f.name.trim()){setErr('Name ist erforderlich.');return;}
+    setSaving(true);
+    const payload={name:f.name.trim(),branche:f.branche.trim()||null,website:f.website.trim()||null,
+      adresse:f.adresse.trim()||null,plz:f.plz.trim()||null,ort:f.ort.trim()||null,land:f.land||'CH',
+      telefon:f.telefon.trim()||null,email:f.email.trim()||null,notizen:f.notizen.trim()||null};
+    const errMsg=await onSave(payload,!!initial);
+    setSaving(false);
+    if(errMsg){setErr(errMsg);return;}
+    onClose();
+  };
+  const inp={className:'nfg-input'};
+  return <div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&onClose()}>
+    <div className="nfg-form-sheet">
+      <button className="nfg-form-close" onClick={onClose}>×</button>
+      <h2 className="nfg-form-title">{initial?'Unternehmen bearbeiten':'Neues Unternehmen'}</h2>
+      <form onSubmit={submit}>
+        <div className="nfg-form-section-h">Stammdaten</div>
+        <div className="nfg-form-row">
+          <label className="nfg-label">Name *<input {...inp} value={f.name} onChange={e=>set('name',e.target.value)} required placeholder="Muster AG"/></label>
+          <label className="nfg-label">Branche<input {...inp} value={f.branche} onChange={e=>set('branche',e.target.value)} placeholder="Landwirtschaft"/></label>
+        </div>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Website<input {...inp} value={f.website} onChange={e=>set('website',e.target.value)} placeholder="www.beispiel.ch"/></label>
+        </div>
+        <div className="nfg-form-section-h">Adresse</div>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Strasse / Nr.<input {...inp} value={f.adresse} onChange={e=>set('adresse',e.target.value)} placeholder="Musterstrasse 1"/></label>
+        </div>
+        <div className="nfg-form-row">
+          <label className="nfg-label">PLZ<input {...inp} value={f.plz} onChange={e=>set('plz',e.target.value)} placeholder="8001" style={{maxWidth:100}}/></label>
+          <label className="nfg-label">Ort<input {...inp} value={f.ort} onChange={e=>set('ort',e.target.value)} placeholder="Zürich"/></label>
+          <label className="nfg-label">Land<input {...inp} value={f.land} onChange={e=>set('land',e.target.value)} placeholder="CH" style={{maxWidth:80}}/></label>
+        </div>
+        <div className="nfg-form-section-h">Kontakt</div>
+        <div className="nfg-form-row">
+          <label className="nfg-label">Telefon<input {...inp} type="tel" value={f.telefon} onChange={e=>set('telefon',e.target.value)} placeholder="+41 44 000 00 00"/></label>
+          <label className="nfg-label">E-Mail<input {...inp} type="email" value={f.email} onChange={e=>set('email',e.target.value)} placeholder="info@beispiel.ch"/></label>
+        </div>
+        <div className="nfg-form-section-h">Notizen</div>
+        <div className="nfg-form-row one">
+          <label className="nfg-label"><textarea className="nfg-textarea" rows={3} value={f.notizen} onChange={e=>set('notizen',e.target.value)} placeholder="Interne Notizen…"/></label>
+        </div>
+        {err&&<p className="nfg-err">{err}</p>}
+        <div className="nfg-form-actions">
+          <button className="nfg-btn-primary" type="submit" disabled={saving}>{saving?'Speichern…':initial?'Speichern':'Unternehmen erstellen'}</button>
+          <button className="nfg-btn-ghost" type="button" onClick={onClose}>Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>;
+}
+
+// ── CRM Aktivität Form Modal ───────────────────────────────────
+const EMPTY_AKT={titel:'',typ:'event',beschreibung:'',datum_von:'',datum_bis:'',ort:'',status:'geplant',notizen:''};
+function CrmAktivitaetFormModal({initial,onClose,onSave}){
+  const [f,setF]=useState(()=>initial?{
+    titel:initial.titel||'',typ:initial.typ||'event',beschreibung:initial.beschreibung||'',
+    datum_von:initial.datum_von||'',datum_bis:initial.datum_bis||'',ort:initial.ort||'',
+    status:initial.status||'geplant',notizen:initial.notizen||''
+  }:{...EMPTY_AKT});
+  const [err,setErr]=useState('');
+  const [saving,setSaving]=useState(false);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const submit=async e=>{
+    e.preventDefault(); setErr('');
+    if(!f.titel.trim()){setErr('Titel ist erforderlich.');return;}
+    setSaving(true);
+    const payload={titel:f.titel.trim(),typ:f.typ,beschreibung:f.beschreibung.trim()||null,
+      datum_von:f.datum_von||null,datum_bis:f.datum_bis||null,ort:f.ort.trim()||null,
+      status:f.status,notizen:f.notizen.trim()||null};
+    const errMsg=await onSave(payload,!!initial);
+    setSaving(false);
+    if(errMsg){setErr(errMsg);return;}
+    onClose();
+  };
+  const inp={className:'nfg-input'};
+  return <div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&onClose()}>
+    <div className="nfg-form-sheet" style={{maxWidth:560}}>
+      <button className="nfg-form-close" onClick={onClose}>×</button>
+      <h2 className="nfg-form-title">{initial?'Aktivität bearbeiten':'Neue Aktivität'}</h2>
+      <form onSubmit={submit}>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Titel *<input {...inp} value={f.titel} onChange={e=>set('titel',e.target.value)} required placeholder="Bodenfest 2026"/></label>
+        </div>
+        <div className="nfg-form-row">
+          <label className="nfg-label">Typ
+            <select className="nfg-select" style={{width:'100%'}} value={f.typ} onChange={e=>set('typ',e.target.value)}>
+              {Object.entries(AKT_TYP).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+            </select>
+          </label>
+          <label className="nfg-label">Status
+            <select className="nfg-select" style={{width:'100%'}} value={f.status} onChange={e=>set('status',e.target.value)}>
+              {Object.entries(AKT_STATUS).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="nfg-form-row">
+          <label className="nfg-label">Datum von<input {...inp} type="date" value={f.datum_von} onChange={e=>set('datum_von',e.target.value)}/></label>
+          <label className="nfg-label">Datum bis<input {...inp} type="date" value={f.datum_bis} onChange={e=>set('datum_bis',e.target.value)}/></label>
+        </div>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Ort<input {...inp} value={f.ort} onChange={e=>set('ort',e.target.value)} placeholder="Zürich"/></label>
+        </div>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Beschreibung<textarea className="nfg-textarea" rows={3} value={f.beschreibung} onChange={e=>set('beschreibung',e.target.value)} placeholder="Was ist geplant?"/></label>
+        </div>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Interne Notizen<textarea className="nfg-textarea" rows={2} value={f.notizen} onChange={e=>set('notizen',e.target.value)} placeholder="Nur für Admins…"/></label>
+        </div>
+        {err&&<p className="nfg-err">{err}</p>}
+        <div className="nfg-form-actions">
+          <button className="nfg-btn-primary" type="submit" disabled={saving}>{saving?'Speichern…':initial?'Speichern':'Aktivität erstellen'}</button>
+          <button className="nfg-btn-ghost" type="button" onClick={onClose}>Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>;
+}
+
+// ── CRM Unternehmen Detail ─────────────────────────────────────
+function CrmUnternehmenDetail({unt,onClose,onEdit,onDelete}){
+  const [contacts,setContacts]=useState([]);
+  const [aktivitaeten,setAktivitaeten]=useState([]);
+  const [allAkt,setAllAkt]=useState([]);
+  const [addingAkt,setAddingAkt]=useState(false);
+  const [newAktId,setNewAktId]=useState('');
+  const [newAktRolle,setNewAktRolle]=useState('');
+  const [loading,setLoading]=useState(true);
+  const [confirmDel,setConfirmDel]=useState(false);
+
+  const reload=useCallback(()=>{
+    Promise.all([
+      db.from('crm_contacts_overview').select('id,vorname,nachname,funktion,kategorie_id').eq('unternehmen_id',unt.id),
+      db.from('crm_unternehmen_aktivitaeten').select('*,crm_aktivitaeten(*)').eq('unternehmen_id',unt.id),
+      db.from('crm_aktivitaeten').select('id,titel,typ,datum_von,status').order('datum_von',{ascending:false})
+    ]).then(([{data:c},{data:ua},{data:a}])=>{
+      setContacts(c||[]);
+      setAktivitaeten(ua||[]);
+      setAllAkt(a||[]);
+      setLoading(false);
+    });
+  },[unt.id]);
+
+  useEffect(()=>{ reload(); },[reload]);
+
+  const handleAddAkt=async()=>{
+    if(!newAktId) return;
+    const{error}=await db.from('crm_unternehmen_aktivitaeten').insert({unternehmen_id:unt.id,aktivitaet_id:newAktId,rolle:newAktRolle.trim()||null});
+    if(!error){ setAddingAkt(false); setNewAktId(''); setNewAktRolle(''); reload(); }
+  };
+  const handleRemoveAkt=async(aktId)=>{
+    await db.from('crm_unternehmen_aktivitaeten').delete().eq('unternehmen_id',unt.id).eq('aktivitaet_id',aktId);
+    reload();
+  };
+
+  const assigned=new Set(aktivitaeten.map(ua=>ua.aktivitaet_id));
+  const available=allAkt.filter(a=>!assigned.has(a.id));
+
+  return <div className="nfg-profile" onClick={e=>e.target.classList.contains('nfg-profile')&&onClose()}>
+    <div className="nfg-profile-sheet">
+      <button className="nfg-profile-close" onClick={onClose}>×</button>
+      <div className="nfg-profile-body" style={{paddingTop:28}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,marginBottom:20,flexWrap:'wrap'}}>
+          <div>
+            {unt.branche&&<span style={{fontSize:11,fontWeight:700,color:'#888',textTransform:'uppercase',letterSpacing:'0.06em'}}>{unt.branche}</span>}
+            <h1 className="nfg-profile-name" style={{marginTop:4,marginBottom:4}}>{unt.name}</h1>
+            {(unt.ort||unt.land)&&<div style={{fontSize:13,color:'#666'}}>{[unt.plz,unt.ort,unt.land!=='CH'?unt.land:null].filter(Boolean).join(' ')}</div>}
+          </div>
+          <div style={{display:'flex',gap:6,flexShrink:0}}>
+            <button className="nfg-btn-sm nfg-btn-sm-edit" onClick={()=>onEdit(unt)}>Bearbeiten</button>
+            <button className="nfg-btn-sm nfg-btn-sm-del" onClick={()=>setConfirmDel(true)}>Löschen</button>
+          </div>
+        </div>
+
+        <section className="nfg-section">
+          <h3 className="nfg-section-h">Kontaktangaben</h3>
+          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {unt.email&&<a href={`mailto:${unt.email}`} style={{fontSize:13,color:'#000',fontWeight:500,textDecoration:'none'}}>✉️ {unt.email}</a>}
+            {unt.telefon&&<a href={`tel:${unt.telefon.replace(/\s/g,'')}`} style={{fontSize:13,color:'#000',fontWeight:500,textDecoration:'none'}}>📞 {unt.telefon}</a>}
+            {unt.website&&<a href={unt.website.startsWith('http')?unt.website:'https://'+unt.website} target="_blank" rel="noopener noreferrer" style={{fontSize:13,color:'#0a66c2',fontWeight:500}}>🌐 {unt.website} →</a>}
+            {unt.adresse&&<span style={{fontSize:13,color:'#666'}}>📍 {[unt.adresse,unt.plz,unt.ort].filter(Boolean).join(', ')}</span>}
+          </div>
+        </section>
+
+        <section className="nfg-section">
+          <h3 className="nfg-section-h">Kontakte ({contacts.length})</h3>
+          {loading&&<p style={{fontSize:13,color:'#888'}}>Laden…</p>}
+          {!loading&&contacts.length===0&&<div className="nfg-empty" style={{padding:'14px',fontSize:13}}>Keine Kontakte diesem Unternehmen zugewiesen.</div>}
+          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {contacts.map(c=><div key={c.id} style={{fontSize:13,background:'#f9fafb',borderRadius:8,padding:'8px 12px',display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontWeight:700}}>{c.vorname} {c.nachname}</span>
+              {c.funktion&&<span style={{color:'#888'}}>· {c.funktion}</span>}
+            </div>)}
+          </div>
+        </section>
+
+        <section className="nfg-section">
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <h3 className="nfg-section-h" style={{margin:0}}>Aktivitäten ({aktivitaeten.length})</h3>
+            {!addingAkt&&available.length>0&&<button className="nfg-btn-primary" style={{padding:'6px 12px',fontSize:12}} onClick={()=>setAddingAkt(true)}>+ Aktivität</button>}
+          </div>
+          {addingAkt&&<div style={{background:'#f9fafb',border:'1px solid var(--nfg-line)',borderRadius:10,padding:'12px',marginBottom:12,display:'flex',flexDirection:'column',gap:8}}>
+            <select className="nfg-select" value={newAktId} onChange={e=>setNewAktId(e.target.value)} style={{width:'100%'}}>
+              <option value="">— Aktivität wählen —</option>
+              {available.map(a=><option key={a.id} value={a.id}>{AKT_TYP[a.typ]?.icon} {a.titel}{a.datum_von?` (${a.datum_von.slice(0,4)})`:''}</option>)}
+            </select>
+            <input className="nfg-input" value={newAktRolle} onChange={e=>setNewAktRolle(e.target.value)} placeholder="Rolle (z.B. Sponsor, Partner) — optional"/>
+            <div style={{display:'flex',gap:8}}>
+              <button className="nfg-btn-primary" style={{padding:'7px 14px',fontSize:12}} disabled={!newAktId} onClick={handleAddAkt}>Hinzufügen</button>
+              <button className="nfg-btn-ghost" style={{padding:'7px 14px',fontSize:12}} onClick={()=>{setAddingAkt(false);setNewAktId('');setNewAktRolle('');}}>Abbrechen</button>
+            </div>
+          </div>}
+          {!loading&&aktivitaeten.length===0&&!addingAkt&&<div className="nfg-empty" style={{padding:'14px',fontSize:13}}>Noch keine Aktivitäten verknüpft.</div>}
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {aktivitaeten.map(ua=>{
+              const a=ua.crm_aktivitaeten; if(!a) return null;
+              const typ=AKT_TYP[a.typ]||AKT_TYP.sonstiges;
+              return <div key={ua.aktivitaet_id} style={{background:'#fff',border:'1px solid var(--nfg-line)',borderRadius:10,padding:'10px 14px',display:'flex',gap:10,alignItems:'center'}}>
+                <span style={{fontSize:18,flexShrink:0}}>{typ.icon}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:13}}>{a.titel}</div>
+                  <div style={{fontSize:11,color:'#888',display:'flex',gap:8,flexWrap:'wrap',marginTop:2}}>
+                    <span>{typ.label}</span>
+                    {a.datum_von&&<span>{fmtDate(a.datum_von)}</span>}
+                    {ua.rolle&&<span style={{fontWeight:700,color:'#444'}}>· {ua.rolle}</span>}
+                  </div>
+                </div>
+                <AktBadge status={a.status}/>
+                <button style={{border:'none',background:'none',cursor:'pointer',fontSize:16,color:'#ccc',padding:'0 4px'}} title="Verknüpfung entfernen" onClick={()=>handleRemoveAkt(ua.aktivitaet_id)}>×</button>
+              </div>;
+            })}
+          </div>
+        </section>
+
+        {unt.notizen&&<section className="nfg-section">
+          <h3 className="nfg-section-h">Notizen</h3>
+          <p style={{fontSize:13,lineHeight:1.6,color:'#444',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,padding:'12px 14px',margin:0,whiteSpace:'pre-wrap'}}>{unt.notizen}</p>
+        </section>}
+      </div>
+    </div>
+
+    {confirmDel&&<div className="nfg-form-overlay" style={{zIndex:400}} onClick={e=>e.target.classList.contains('nfg-form-overlay')&&setConfirmDel(false)}>
+      <div className="nfg-form-sheet" style={{maxWidth:420}}>
+        <h3 style={{margin:'0 0 12px',fontSize:20,fontWeight:700}}>Unternehmen löschen?</h3>
+        <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>„{unt.name}" wird dauerhaft entfernt. Verknüpfte Kontakte und Aktivitäten bleiben erhalten.</p>
+        <div style={{display:'flex',gap:10}}>
+          <button className="nfg-btn-primary" style={{background:'#e53e3e',borderColor:'#e53e3e',color:'#fff'}} onClick={()=>{onDelete(unt);setConfirmDel(false);}}>Endgültig löschen</button>
+          <button className="nfg-btn-ghost" onClick={()=>setConfirmDel(false)}>Abbrechen</button>
+        </div>
+      </div>
+    </div>}
+  </div>;
+}
+
+// ── CRM Aktivität Detail ───────────────────────────────────────
+function CrmAktivitaetDetail({akt,onClose,onEdit,onDelete}){
+  const [teilnehmer,setTeilnehmer]=useState([]);
+  const [allUnt,setAllUnt]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [addingUnt,setAddingUnt]=useState(false);
+  const [newUntId,setNewUntId]=useState('');
+  const [newUntRolle,setNewUntRolle]=useState('');
+  const [confirmDel,setConfirmDel]=useState(false);
+  const typ=AKT_TYP[akt.typ]||AKT_TYP.sonstiges;
+
+  const reload=useCallback(()=>{
+    Promise.all([
+      db.from('crm_unternehmen_aktivitaeten').select('*,crm_unternehmen(*)').eq('aktivitaet_id',akt.id),
+      db.from('crm_unternehmen').select('id,name,branche').order('name')
+    ]).then(([{data:t},{data:u}])=>{ setTeilnehmer(t||[]); setAllUnt(u||[]); setLoading(false); });
+  },[akt.id]);
+
+  useEffect(()=>{ reload(); },[reload]);
+
+  const handleAddUnt=async()=>{
+    if(!newUntId) return;
+    const{error}=await db.from('crm_unternehmen_aktivitaeten').insert({unternehmen_id:newUntId,aktivitaet_id:akt.id,rolle:newUntRolle.trim()||null});
+    if(!error){ setAddingUnt(false); setNewUntId(''); setNewUntRolle(''); reload(); }
+  };
+  const handleRemoveUnt=async(untId)=>{
+    await db.from('crm_unternehmen_aktivitaeten').delete().eq('aktivitaet_id',akt.id).eq('unternehmen_id',untId);
+    reload();
+  };
+
+  const assigned=new Set(teilnehmer.map(t=>t.unternehmen_id));
+  const available=allUnt.filter(u=>!assigned.has(u.id));
+
+  return <div className="nfg-profile" onClick={e=>e.target.classList.contains('nfg-profile')&&onClose()}>
+    <div className="nfg-profile-sheet">
+      <button className="nfg-profile-close" onClick={onClose}>×</button>
+      <div className="nfg-profile-body" style={{paddingTop:28}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,marginBottom:20,flexWrap:'wrap'}}>
+          <div>
+            <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:6}}>
+              <span style={{fontSize:22}}>{typ.icon}</span>
+              <span style={{fontSize:12,fontWeight:700,color:typ.color,textTransform:'uppercase',letterSpacing:'0.06em'}}>{typ.label}</span>
+              <AktBadge status={akt.status}/>
+            </div>
+            <h1 className="nfg-profile-name" style={{marginTop:0,marginBottom:4}}>{akt.titel}</h1>
+            <div style={{fontSize:13,color:'#666',display:'flex',gap:12,flexWrap:'wrap'}}>
+              {akt.datum_von&&<span>📅 {fmtDate(akt.datum_von)}{akt.datum_bis&&akt.datum_bis!==akt.datum_von?` – ${fmtDate(akt.datum_bis)}`:''}</span>}
+              {akt.ort&&<span>📍 {akt.ort}</span>}
+            </div>
+          </div>
+          <div style={{display:'flex',gap:6,flexShrink:0}}>
+            <button className="nfg-btn-sm nfg-btn-sm-edit" onClick={()=>onEdit(akt)}>Bearbeiten</button>
+            <button className="nfg-btn-sm nfg-btn-sm-del" onClick={()=>setConfirmDel(true)}>Löschen</button>
+          </div>
+        </div>
+
+        {akt.beschreibung&&<section className="nfg-section">
+          <h3 className="nfg-section-h">Beschreibung</h3>
+          <p style={{fontSize:13,lineHeight:1.6,color:'#444',margin:0,whiteSpace:'pre-wrap'}}>{akt.beschreibung}</p>
+        </section>}
+
+        <section className="nfg-section">
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <h3 className="nfg-section-h" style={{margin:0}}>Teilnehmende Unternehmen ({teilnehmer.length})</h3>
+            {!addingUnt&&available.length>0&&<button className="nfg-btn-primary" style={{padding:'6px 12px',fontSize:12}} onClick={()=>setAddingUnt(true)}>+ Unternehmen</button>}
+          </div>
+          {addingUnt&&<div style={{background:'#f9fafb',border:'1px solid var(--nfg-line)',borderRadius:10,padding:'12px',marginBottom:12,display:'flex',flexDirection:'column',gap:8}}>
+            <select className="nfg-select" value={newUntId} onChange={e=>setNewUntId(e.target.value)} style={{width:'100%'}}>
+              <option value="">— Unternehmen wählen —</option>
+              {available.map(u=><option key={u.id} value={u.id}>{u.name}{u.branche?` · ${u.branche}`:''}</option>)}
+            </select>
+            <input className="nfg-input" value={newUntRolle} onChange={e=>setNewUntRolle(e.target.value)} placeholder="Rolle (z.B. Sponsor, Teilnehmer) — optional"/>
+            <div style={{display:'flex',gap:8}}>
+              <button className="nfg-btn-primary" style={{padding:'7px 14px',fontSize:12}} disabled={!newUntId} onClick={handleAddUnt}>Hinzufügen</button>
+              <button className="nfg-btn-ghost" style={{padding:'7px 14px',fontSize:12}} onClick={()=>{setAddingUnt(false);setNewUntId('');setNewUntRolle('');}}>Abbrechen</button>
+            </div>
+          </div>}
+          {!loading&&teilnehmer.length===0&&!addingUnt&&<div className="nfg-empty" style={{padding:'14px',fontSize:13}}>Noch keine Unternehmen verknüpft.</div>}
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {teilnehmer.map(t=>{
+              const u=t.crm_unternehmen; if(!u) return null;
+              return <div key={t.unternehmen_id} style={{background:'#fff',border:'1px solid var(--nfg-line)',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:10}}>
+                <span style={{fontSize:16,flexShrink:0}}>🏢</span>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:13}}>{u.name}</div>
+                  {(u.branche||t.rolle)&&<div style={{fontSize:11,color:'#888',marginTop:2}}>
+                    {u.branche&&<span>{u.branche}</span>}
+                    {t.rolle&&<span style={{fontWeight:700,color:'#444'}}>{u.branche?' · ':''}{t.rolle}</span>}
+                  </div>}
+                </div>
+                <button style={{border:'none',background:'none',cursor:'pointer',fontSize:16,color:'#ccc',padding:'0 4px'}} onClick={()=>handleRemoveUnt(t.unternehmen_id)}>×</button>
+              </div>;
+            })}
+          </div>
+        </section>
+
+        {akt.notizen&&<section className="nfg-section">
+          <h3 className="nfg-section-h">Interne Notizen</h3>
+          <p style={{fontSize:13,lineHeight:1.6,color:'#444',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,padding:'12px 14px',margin:0,whiteSpace:'pre-wrap'}}>{akt.notizen}</p>
+        </section>}
+      </div>
+    </div>
+
+    {confirmDel&&<div className="nfg-form-overlay" style={{zIndex:400}} onClick={e=>e.target.classList.contains('nfg-form-overlay')&&setConfirmDel(false)}>
+      <div className="nfg-form-sheet" style={{maxWidth:420}}>
+        <h3 style={{margin:'0 0 12px',fontSize:20,fontWeight:700}}>Aktivität löschen?</h3>
+        <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>„{akt.titel}" und alle Verknüpfungen werden dauerhaft entfernt.</p>
+        <div style={{display:'flex',gap:10}}>
+          <button className="nfg-btn-primary" style={{background:'#e53e3e',borderColor:'#e53e3e',color:'#fff'}} onClick={()=>{onDelete(akt);setConfirmDel(false);}}>Endgültig löschen</button>
+          <button className="nfg-btn-ghost" onClick={()=>setConfirmDel(false)}>Abbrechen</button>
+        </div>
+      </div>
+    </div>}
+  </div>;
+}
+
+// ── CRM Unternehmen Tab ────────────────────────────────────────
+function CrmUnternehmenTab(){
+  const [list,setList]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [search,setSearch]=useState('');
+  const [formItem,setFormItem]=useState(null);
+  const [detail,setDetail]=useState(null);
+
+  const reload=()=>{
+    db.from('crm_unternehmen').select('*').order('name')
+      .then(({data})=>{ setList(data||[]); setLoading(false); });
+  };
+  useEffect(()=>{ reload(); },[]);
+
+  const handleSave=async(payload,isEdit)=>{
+    if(isEdit&&detail?.id){
+      const{error}=await db.from('crm_unternehmen').update(payload).eq('id',detail.id);
+      if(error) return error.message;
+    }else{
+      const{error}=await db.from('crm_unternehmen').insert(payload);
+      if(error) return error.message;
+    }
+    reload(); return null;
+  };
+  const handleDelete=async(u)=>{
+    await db.from('crm_unternehmen').delete().eq('id',u.id);
+    setList(prev=>prev.filter(x=>x.id!==u.id)); setDetail(null);
+  };
+
+  const filtered=useMemo(()=>list.filter(u=>{
+    if(!search) return true;
+    const q=search.toLowerCase();
+    return [u.name,u.branche,u.ort,u.email].filter(Boolean).join(' ').toLowerCase().includes(q);
+  }),[list,search]);
+
+  return <>
+    <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:20}}>
+      <div style={{background:'#fff',border:'1px solid var(--nfg-line)',borderRadius:12,padding:'12px 18px',textAlign:'center',minWidth:90}}>
+        <div style={{fontSize:26,fontWeight:700}}>{list.length}</div>
+        <div style={{fontSize:11,fontWeight:700,color:'#666',textTransform:'uppercase',letterSpacing:'0.04em'}}>Unternehmen</div>
+      </div>
+    </div>
+    <div className="nfg-admin-bar" style={{marginBottom:16}}>
+      <div style={{position:'relative'}}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input className="nfg-input" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Name, Branche, Ort…" style={{paddingLeft:36,width:240}}/>
+      </div>
+      <button className="nfg-btn-primary" onClick={()=>setFormItem(false)}>+ Neues Unternehmen</button>
+    </div>
+    {loading&&<div style={{padding:'32px 0',textAlign:'center',color:'#666'}}>Laden…</div>}
+    {!loading&&filtered.length===0&&<div className="nfg-empty">{list.length===0?'Noch keine Unternehmen. Füge das erste hinzu.':'Keine Treffer.'}</div>}
+    <div className="nfg-admin-list">
+      {filtered.map(u=><div key={u.id} className="nfg-admin-item" style={{cursor:'pointer'}} onClick={()=>setDetail(u)}>
+        <div style={{width:38,height:38,borderRadius:10,background:'#f0f0f0',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>🏢</div>
+        <div className="nfg-admin-info">
+          <div className="nfg-admin-name">{u.name}</div>
+          <div className="nfg-admin-meta">{[u.branche,u.ort].filter(Boolean).join(' · ')}</div>
+        </div>
+        {u.website&&<span style={{fontSize:11,color:'#0a66c2',fontWeight:600,flexShrink:0}}>🌐</span>}
+      </div>)}
+    </div>
+    {formItem!==null&&<CrmUnternehmenFormModal initial={formItem||null} onClose={()=>setFormItem(null)} onSave={handleSave}/>}
+    {detail&&<CrmUnternehmenDetail unt={detail} onClose={()=>setDetail(null)} onEdit={u=>{setDetail(null);setFormItem(u);}} onDelete={handleDelete}/>}
+  </>;
+}
+
+// ── CRM Aktivitäten Tab ────────────────────────────────────────
+function CrmAktivitaetenTab(){
+  const [list,setList]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [search,setSearch]=useState('');
+  const [filterTyp,setFilterTyp]=useState('');
+  const [formItem,setFormItem]=useState(null);
+  const [detail,setDetail]=useState(null);
+
+  const reload=()=>{
+    db.from('crm_aktivitaeten').select('*').order('datum_von',{ascending:false,nullsFirst:false})
+      .then(({data})=>{ setList(data||[]); setLoading(false); });
+  };
+  useEffect(()=>{ reload(); },[]);
+
+  const handleSave=async(payload,isEdit)=>{
+    if(isEdit&&detail?.id){
+      const{error}=await db.from('crm_aktivitaeten').update(payload).eq('id',detail.id);
+      if(error) return error.message;
+    }else{
+      const{error}=await db.from('crm_aktivitaeten').insert(payload);
+      if(error) return error.message;
+    }
+    reload(); return null;
+  };
+  const handleDelete=async(a)=>{
+    await db.from('crm_aktivitaeten').delete().eq('id',a.id);
+    setList(prev=>prev.filter(x=>x.id!==a.id)); setDetail(null);
+  };
+
+  const filtered=useMemo(()=>list.filter(a=>{
+    if(filterTyp&&a.typ!==filterTyp) return false;
+    if(search){const q=search.toLowerCase();if(![a.titel,a.ort,a.beschreibung].filter(Boolean).join(' ').toLowerCase().includes(q))return false;}
+    return true;
+  }),[list,search,filterTyp]);
+
+  return <>
+    <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:20}}>
+      <div style={{background:'#fff',border:'1px solid var(--nfg-line)',borderRadius:12,padding:'12px 18px',textAlign:'center',minWidth:90}}>
+        <div style={{fontSize:26,fontWeight:700}}>{list.length}</div>
+        <div style={{fontSize:11,fontWeight:700,color:'#666',textTransform:'uppercase',letterSpacing:'0.04em'}}>Aktivitäten</div>
+      </div>
+      {Object.entries(AKT_TYP).map(([k,v])=>{
+        const n=list.filter(a=>a.typ===k).length; if(!n) return null;
+        return <div key={k} style={{background:v.color+'15',border:`1.5px solid ${v.color}40`,borderRadius:12,padding:'12px 18px',textAlign:'center',minWidth:80}}>
+          <div style={{fontSize:22,fontWeight:700,color:v.color}}>{n}</div>
+          <div style={{fontSize:11,fontWeight:700,color:v.color,textTransform:'uppercase',letterSpacing:'0.04em'}}>{v.label}</div>
+        </div>;
+      })}
+    </div>
+    <div className="nfg-admin-bar" style={{marginBottom:16}}>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+        <div style={{position:'relative'}}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input className="nfg-input" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Titel, Ort…" style={{paddingLeft:36,width:200}}/>
+        </div>
+        <select className="nfg-select" value={filterTyp} onChange={e=>setFilterTyp(e.target.value)} style={{minWidth:150}}>
+          <option value="">Alle Typen</option>
+          {Object.entries(AKT_TYP).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+        </select>
+      </div>
+      <button className="nfg-btn-primary" onClick={()=>setFormItem(false)}>+ Neue Aktivität</button>
+    </div>
+    {loading&&<div style={{padding:'32px 0',textAlign:'center',color:'#666'}}>Laden…</div>}
+    {!loading&&filtered.length===0&&<div className="nfg-empty">{list.length===0?'Noch keine Aktivitäten. Erstelle die erste.':'Keine Treffer.'}</div>}
+    <div className="nfg-admin-list">
+      {filtered.map(a=>{
+        const typ=AKT_TYP[a.typ]||AKT_TYP.sonstiges;
+        return <div key={a.id} className="nfg-admin-item" style={{cursor:'pointer'}} onClick={()=>setDetail(a)}>
+          <div style={{width:38,height:38,borderRadius:10,background:typ.color+'18',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>{typ.icon}</div>
+          <div className="nfg-admin-info">
+            <div className="nfg-admin-name" style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+              {a.titel}
+              <AktBadge status={a.status}/>
+            </div>
+            <div className="nfg-admin-meta">{[typ.label,a.ort].filter(Boolean).join(' · ')}</div>
+          </div>
+          {a.datum_von&&<span style={{fontSize:11,color:'#888',flexShrink:0}}>{fmtDate(a.datum_von)}</span>}
+        </div>;
+      })}
+    </div>
+    {formItem!==null&&<CrmAktivitaetFormModal initial={formItem||null} onClose={()=>setFormItem(null)} onSave={handleSave}/>}
+    {detail&&<CrmAktivitaetDetail akt={detail} onClose={()=>setDetail(null)} onEdit={a=>{setDetail(null);setFormItem(a);}} onDelete={handleDelete}/>}
   </>;
 }
 
