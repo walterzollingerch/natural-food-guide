@@ -3215,8 +3215,8 @@ function CrmUnternehmenTab(){
   useEffect(()=>{ reload(); },[]);
 
   const handleSave=async(payload,isEdit)=>{
-    if(isEdit&&detail?.id){
-      const{error}=await db.from('crm_unternehmen').update(payload).eq('id',detail.id);
+    if(isEdit&&formItem?.id){
+      const{error}=await db.from('crm_unternehmen').update(payload).eq('id',formItem.id);
       if(error) return error.message;
     }else{
       const{error}=await db.from('crm_unternehmen').insert(payload);
@@ -3282,8 +3282,8 @@ function CrmAktivitaetenTab(){
   useEffect(()=>{ reload(); },[]);
 
   const handleSave=async(payload,isEdit)=>{
-    if(isEdit&&detail?.id){
-      const{error}=await db.from('crm_aktivitaeten').update(payload).eq('id',detail.id);
+    if(isEdit&&formItem?.id){
+      const{error}=await db.from('crm_aktivitaeten').update(payload).eq('id',formItem.id);
       if(error) return error.message;
     }else{
       const{error}=await db.from('crm_aktivitaeten').insert(payload);
