@@ -126,8 +126,10 @@ CREATE INDEX IF NOT EXISTS idx_crm_contacts_unternehmen ON crm_contacts (unterne
 
 -- ----------------------------------------------------------------
 -- 5. View crm_contacts_overview aktualisieren (+ unternehmen_name)
+--    DROP erforderlich, weil sich die Spaltenreihenfolge ändert
 -- ----------------------------------------------------------------
-CREATE OR REPLACE VIEW crm_contacts_overview AS
+DROP VIEW IF EXISTS crm_contacts_overview;
+CREATE VIEW crm_contacts_overview AS
 SELECT
   c.id,
   c.vorname,
