@@ -861,8 +861,18 @@ function Sidebar({tab,setTab,user,userRole,onAuth,onLogout}) {
   const isAdmin=userRole==='admin';
   return <aside className="nfg-sidebar">
     <div className="nfg-sidebar-brand">
-      <img src="https://sotoso.org/assets/img/logo.svg" alt="Soil to Soul" style={{height:32,marginBottom:6,filter:'brightness(0) invert(1)'}}/>
-      <div className="nfg-sidebar-ttl" style={{fontSize:13,fontWeight:600,letterSpacing:'0.05em',opacity:0.7}}>Mgt Tool</div>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+        <svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0,borderRadius:6}}>
+          <rect width="44" height="44" fill="#d2dc46"/>
+          <text x="5" y="16" fontFamily="Arial Black, sans-serif" fontWeight="900" fontSize="13" fill="#000">SOIL</text>
+          <text x="5" y="30" fontFamily="Arial Black, sans-serif" fontWeight="900" fontSize="13" fill="#000">TO</text>
+          <text x="5" y="42" fontFamily="Arial Black, sans-serif" fontWeight="900" fontSize="11" fill="#000">SOUL</text>
+        </svg>
+        <div style={{lineHeight:1.15}}>
+          <div style={{fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.9)',letterSpacing:'0.06em',textTransform:'uppercase'}}>Soil to Soul</div>
+          <div style={{fontSize:10,fontWeight:400,color:'rgba(255,255,255,0.5)',letterSpacing:'0.04em'}}>Mgt Tool</div>
+        </div>
+      </div>
     </div>
     <nav>
       <button className={'nfg-sidebar-btn'+(tab==='start'?' on':'')} onClick={()=>setTab('start')}>
