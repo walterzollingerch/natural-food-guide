@@ -2377,6 +2377,394 @@ function SprachTab() {
   </div>;
 }
 
+// ── CRM ───────────────────────────────────────────────────────
+const CRM_TYP={
+  event_teilnahme: {label:'Event-Teilnahme',  icon:'🎟'},
+  speaker_auftritt:{label:'Speaker-Auftritt', icon:'🎙'},
+  kooperation:     {label:'Kooperation',      icon:'🤝'},
+  medienbericht:   {label:'Medienbericht',    icon:'📰'},
+  sonstiges:       {label:'Sonstiges',        icon:'📌'}
+};
+
+function KatBadge({katId,kategorien}) {
+  const kat=kategorien.find(k=>k.id===katId);
+  if(!kat) return null;
+  const color=kat.farbe||'#6b7280';
+  return <span style={{fontSize:11,fontWeight:700,padding:'2px 9px',borderRadius:999,background:color+'22',color,border:`1.5px solid ${color}55`,whiteSpace:'nowrap'}}>{kat.name}</span>;
+}
+
+const EMPTY_CRM={vorname:'',nachname:'',funktion:'',firma:'',email:'',telefon:'',linkedin:'',social_media:'',kategorie_id:'',notizen:'',einwilligung:false,einwilligung_datum:''};
+
+function CrmKontaktFormModal({initial,kategorien,onClose,onSave}) {
+  const [f,setF]=useState(()=>initial?{
+    vorname:initial.vorname||'',nachname:initial.nachname||'',funktion:initial.funktion||'',
+    firma:initial.firma||'',email:initial.email||'',telefon:initial.telefon||'',
+    linkedin:initial.linkedin||'',social_media:initial.social_media||'',
+    kategorie_id:initial.kategorie_id||'',notizen:initial.notizen||'',
+    einwilligung:!!initial.einwilligung,einwilligung_datum:initial.einwilligung_datum||''
+  }:{...EMPTY_CRM});
+  const [err,setErr]=useState('');
+  const [saving,setSaving]=useState(false);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  const submit=async e=>{
+    e.preventDefault(); setErr('');
+    if(!f.vorname.trim()||!f.nachname.trim()){setErr('Vor- und Nachname sind erforderlich.');return;}
+    setSaving(true);
+    const payload={
+      vorname:f.vorname.trim(),nachname:f.nachname.trim(),
+      funktion:f.funktion.trim()||null,firma:f.firma.trim()||null,
+      email:f.email.trim()||null,telefon:f.telefon.trim()||null,
+      linkedin:f.linkedin.trim()||null,social_media:f.social_media.trim()||null,
+      kategorie_id:f.kategorie_id||null,notizen:f.notizen.trim()||null,
+      einwilligung:f.einwilligung,einwilligung_datum:f.einwilligung_datum||null
+    };
+    const errMsg=await onSave(payload,!!initial);
+    setSaving(false);
+    if(errMsg){setErr(errMsg);return;}
+    onClose();
+  };
+  const inp={className:'nfg-input'};
+  return <div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&onClose()}>
+    <div className="nfg-form-sheet">
+      <button className="nfg-form-close" onClick={onClose}>×</button>
+      <h2 className="nfg-form-title">{initial?'Kontakt bearbeiten':'Neuer Kontakt'}</h2>
+      <form onSubmit={submit}>
+        <div className="nfg-form-section-h">Person</div>
+        <div className="nfg-form-row">
+          <label className="nfg-label">Vorname *<input {...inp} value={f.vorname} onChange={e=>set('vorname',e.target.value)} required placeholder="Maria"/></label>
+          <label className="nfg-label">Nachname *<input {...inp} value={f.nachname} onChange={e=>set('nachname',e.target.value)} required placeholder="Muster"/></label>
+        </div>
+        <div className="nfg-form-row">
+          <label className="nfg-label">Funktion / Position<input {...inp} value={f.funktion} onChange={e=>set('funktion',e.target.value)} placeholder="Redaktorin"/></label>
+          <label className="nfg-label">Firma / Organisation<input {...inp} value={f.firma} onChange={e=>set('firma',e.target.value)} placeholder="NZZ"/></label>
+        </div>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Kategorie
+            <select className="nfg-select" style={{width:'100%'}} value={f.kategorie_id} onChange={e=>set('kategorie_id',e.target.value)}>
+              <option value="">— keine —</option>
+              {kategorien.map(k=><option key={k.id} value={k.id}>{k.name}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="nfg-form-section-h">Kontaktangaben</div>
+        <div className="nfg-form-row">
+          <label className="nfg-label">E-Mail<input {...inp} type="email" value={f.email} onChange={e=>set('email',e.target.value)} placeholder="maria@beispiel.ch"/></label>
+          <label className="nfg-label">Telefon<input {...inp} type="tel" value={f.telefon} onChange={e=>set('telefon',e.target.value)} placeholder="+41 44 000 00 00"/></label>
+        </div>
+        <div className="nfg-form-row">
+          <label className="nfg-label">LinkedIn<input {...inp} value={f.linkedin} onChange={e=>set('linkedin',e.target.value)} placeholder="linkedin.com/in/maria-muster"/></label>
+          <label className="nfg-label">Social Media<input {...inp} value={f.social_media} onChange={e=>set('social_media',e.target.value)} placeholder="@mariamuster"/></label>
+        </div>
+        <div className="nfg-form-section-h">Notizen</div>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Interne Notizen (nur für Admins sichtbar)<textarea className="nfg-textarea" rows={3} value={f.notizen} onChange={e=>set('notizen',e.target.value)} placeholder="Wichtige Informationen zur Beziehung…"/></label>
+        </div>
+        <div className="nfg-form-section-h">Datenschutz (DSG)</div>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          <label className="nfg-check-lbl"><input type="checkbox" checked={f.einwilligung} onChange={e=>set('einwilligung',e.target.checked)}/>Einwilligung zur Datenspeicherung erteilt</label>
+          {f.einwilligung&&<label className="nfg-label">Einwilligungsdatum<input {...inp} type="date" value={f.einwilligung_datum} onChange={e=>set('einwilligung_datum',e.target.value)}/></label>}
+        </div>
+        {err&&<p className="nfg-err">{err}</p>}
+        <div className="nfg-form-actions">
+          <button className="nfg-btn-primary" type="submit" disabled={saving} style={{opacity:saving?0.7:1}}>{saving?'Speichern…':initial?'Speichern':'Kontakt erstellen'}</button>
+          <button className="nfg-btn-ghost" type="button" onClick={onClose}>Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>;
+}
+
+function CrmInteraktionFormModal({contactName,events,onClose,onSave}) {
+  const [f,setF]=useState({typ:'event_teilnahme',titel:'',beschreibung:'',datum:'',event_id:''});
+  const [err,setErr]=useState('');
+  const [saving,setSaving]=useState(false);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const submit=async e=>{
+    e.preventDefault(); setErr('');
+    setSaving(true);
+    const payload={typ:f.typ,titel:f.titel.trim()||null,beschreibung:f.beschreibung.trim()||null,datum:f.datum||null,event_id:f.typ==='event_teilnahme'&&f.event_id?f.event_id:null};
+    const errMsg=await onSave(payload);
+    setSaving(false);
+    if(errMsg){setErr(errMsg);return;}
+    onClose();
+  };
+  const inp={className:'nfg-input'};
+  const evtSorted=[...events].sort((a,b)=>(b.date_start||'').localeCompare(a.date_start||''));
+  return <div className="nfg-form-overlay" style={{zIndex:400}} onClick={e=>e.target.classList.contains('nfg-form-overlay')&&onClose()}>
+    <div className="nfg-form-sheet" style={{maxWidth:540}}>
+      <button className="nfg-form-close" onClick={onClose}>×</button>
+      <h2 className="nfg-form-title">Interaktion erfassen</h2>
+      <p style={{margin:'-16px 0 24px',fontSize:13,color:'#888'}}>{contactName}</p>
+      <form onSubmit={submit}>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Typ *
+            <select className="nfg-select" style={{width:'100%'}} value={f.typ} onChange={e=>set('typ',e.target.value)}>
+              {Object.entries(CRM_TYP).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+            </select>
+          </label>
+        </div>
+        {f.typ==='event_teilnahme'&&evtSorted.length>0&&<div className="nfg-form-row one">
+          <label className="nfg-label">Event verknüpfen <small style={{fontWeight:400,color:'#888'}}>(optional)</small>
+            <select className="nfg-select" style={{width:'100%'}} value={f.event_id} onChange={e=>set('event_id',e.target.value)}>
+              <option value="">— kein Event —</option>
+              {evtSorted.map(ev=><option key={ev.id} value={ev.id}>{ev.title}{ev.date_start?` (${ev.date_start.slice(0,4)})`:''}</option>)}
+            </select>
+          </label>
+        </div>}
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Titel / Bezeichnung<input {...inp} value={f.titel} onChange={e=>set('titel',e.target.value)} placeholder="z.B. Bodenfest 2026"/></label>
+        </div>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Datum<input {...inp} type="date" value={f.datum} onChange={e=>set('datum',e.target.value)}/></label>
+        </div>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Beschreibung / Notiz<textarea className="nfg-textarea" rows={3} value={f.beschreibung} onChange={e=>set('beschreibung',e.target.value)} placeholder="Details zur Interaktion…"/></label>
+        </div>
+        {err&&<p className="nfg-err">{err}</p>}
+        <div className="nfg-form-actions">
+          <button className="nfg-btn-primary" type="submit" disabled={saving} style={{opacity:saving?0.7:1}}>{saving?'Speichern…':'Interaktion speichern'}</button>
+          <button className="nfg-btn-ghost" type="button" onClick={onClose}>Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>;
+}
+
+function CrmKontaktDetail({contact,kategorien,events,currentUserId,onClose,onEdit,onDelete}) {
+  const [interaktionen,setInteraktionen]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [showIaktForm,setShowIaktForm]=useState(false);
+
+  useEffect(()=>{
+    setLoading(true);
+    db.from('crm_interaktionen').select('*').eq('contact_id',contact.id)
+      .order('datum',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false})
+      .then(({data})=>{ setInteraktionen(data||[]); setLoading(false); });
+  },[contact.id]);
+
+  const handleAddIakt=async(payload)=>{
+    const{data:row,error}=await db.from('crm_interaktionen').insert({...payload,contact_id:contact.id,erstellt_von:currentUserId||null}).select().single();
+    if(error) return error.message;
+    setInteraktionen(prev=>[row,...prev]);
+    return null;
+  };
+
+  const delIakt=async(id)=>{
+    await db.from('crm_interaktionen').delete().eq('id',id);
+    setInteraktionen(prev=>prev.filter(x=>x.id!==id));
+  };
+
+  const contactName=`${contact.vorname} ${contact.nachname}`;
+  return <div className="nfg-profile" onClick={e=>e.target.classList.contains('nfg-profile')&&onClose()}>
+    <div className="nfg-profile-sheet">
+      <button className="nfg-profile-close" onClick={onClose}>×</button>
+      <div className="nfg-profile-body" style={{paddingTop:28}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,marginBottom:16,flexWrap:'wrap'}}>
+          <div>
+            {contact.kategorie_id&&<KatBadge katId={contact.kategorie_id} kategorien={kategorien}/>}
+            <h1 className="nfg-profile-name" style={{marginTop:8,marginBottom:4}}>{contactName}</h1>
+            {(contact.funktion||contact.firma)&&<div style={{fontSize:14,color:'#666'}}>{[contact.funktion,contact.firma].filter(Boolean).join(' · ')}</div>}
+          </div>
+          <div style={{display:'flex',gap:6,flexShrink:0}}>
+            <button className="nfg-btn-sm nfg-btn-sm-edit" onClick={()=>onEdit(contact)}>Bearbeiten</button>
+            <button className="nfg-btn-sm nfg-btn-sm-del" onClick={()=>onDelete(contact)}>Löschen</button>
+          </div>
+        </div>
+
+        <section className="nfg-section">
+          <h3 className="nfg-section-h">Kontaktangaben</h3>
+          <div style={{display:'flex',flexDirection:'column',gap:7}}>
+            {contact.email&&<a href={`mailto:${contact.email}`} style={{display:'flex',gap:8,alignItems:'center',fontSize:13,color:'#000',textDecoration:'none',fontWeight:500}}>✉️ {contact.email}</a>}
+            {contact.telefon&&<a href={`tel:${contact.telefon.replace(/\s/g,'')}`} style={{display:'flex',gap:8,alignItems:'center',fontSize:13,color:'#000',textDecoration:'none',fontWeight:500}}>📞 {contact.telefon}</a>}
+            {contact.linkedin&&<a href={contact.linkedin.startsWith('http')?contact.linkedin:'https://'+contact.linkedin} target="_blank" rel="noopener noreferrer" style={{display:'flex',gap:8,alignItems:'center',fontSize:13,color:'#0a66c2',fontWeight:500}}>🔗 LinkedIn →</a>}
+            {contact.social_media&&<span style={{fontSize:13,color:'#666',display:'flex',gap:8}}>📱 {contact.social_media}</span>}
+            {!contact.email&&!contact.telefon&&!contact.linkedin&&!contact.social_media&&<span style={{fontSize:13,color:'#aaa'}}>Keine Kontaktangaben erfasst.</span>}
+          </div>
+        </section>
+
+        <div style={{marginBottom:16}}>
+          <span style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:12,padding:'4px 10px',borderRadius:8,background:contact.einwilligung?'#dcfce7':'#fef9c3',color:contact.einwilligung?'#166534':'#92400e',fontWeight:600}}>
+            {contact.einwilligung?'✓ DSG Einwilligung erteilt':'⚠ Keine Einwilligung erfasst'}
+            {contact.einwilligung&&contact.einwilligung_datum&&` · ${fmtDate(contact.einwilligung_datum)}`}
+          </span>
+        </div>
+
+        {contact.notizen&&<section className="nfg-section">
+          <h3 className="nfg-section-h">Interne Notizen</h3>
+          <p style={{fontSize:13,lineHeight:1.6,color:'#444',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,padding:'12px 14px',margin:0,whiteSpace:'pre-wrap'}}>{contact.notizen}</p>
+        </section>}
+
+        <section className="nfg-section">
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+            <h3 className="nfg-section-h" style={{margin:0}}>Beziehungshistorie {!loading&&`(${interaktionen.length})`}</h3>
+            <button className="nfg-btn-primary" style={{padding:'7px 14px',fontSize:12}} onClick={()=>setShowIaktForm(true)}>+ Interaktion</button>
+          </div>
+          {loading&&<p style={{fontSize:13,color:'#888'}}>Laden…</p>}
+          {!loading&&interaktionen.length===0&&<div className="nfg-empty" style={{padding:'20px',fontSize:13}}>Noch keine Interaktionen erfasst.</div>}
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {interaktionen.map(ia=>{
+              const ti=CRM_TYP[ia.typ]||{icon:'📌',label:ia.typ};
+              const evLinked=ia.event_id?events.find(ev=>ev.id===ia.event_id):null;
+              return <div key={ia.id} style={{background:'#fff',border:'1px solid var(--nfg-line)',borderRadius:12,padding:'12px 14px',display:'flex',gap:12,alignItems:'flex-start'}}>
+                <span style={{fontSize:20,flexShrink:0,marginTop:1}}>{ti.icon}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,flexWrap:'wrap'}}>
+                    <div>
+                      <span style={{fontWeight:700,fontSize:13}}>{ia.titel||ti.label}</span>
+                      {ia.titel&&<span style={{fontSize:11,color:'#888',marginLeft:8,fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em'}}>{ti.label}</span>}
+                    </div>
+                    <div style={{display:'flex',gap:8,alignItems:'center',flexShrink:0}}>
+                      {ia.datum&&<span style={{fontSize:11,background:'var(--nfg-accent)',padding:'2px 7px',borderRadius:5,fontWeight:700}}>{fmtDate(ia.datum)}</span>}
+                      <button style={{border:'none',background:'none',cursor:'pointer',fontSize:16,color:'#ccc',lineHeight:1,padding:'0 2px'}} title="Löschen" onClick={()=>delIakt(ia.id)}>×</button>
+                    </div>
+                  </div>
+                  {ia.beschreibung&&<p style={{margin:'6px 0 0',fontSize:13,color:'#666',lineHeight:1.5,whiteSpace:'pre-wrap'}}>{ia.beschreibung}</p>}
+                  {evLinked&&<div style={{marginTop:6,fontSize:12,color:'#8b5cf6',fontWeight:600}}>🎟 {evLinked.title}</div>}
+                </div>
+              </div>;
+            })}
+          </div>
+        </section>
+      </div>
+    </div>
+    {showIaktForm&&<CrmInteraktionFormModal contactName={contactName} events={events} onClose={()=>setShowIaktForm(false)} onSave={handleAddIakt}/>}
+  </div>;
+}
+
+function CrmTab({events}) {
+  const [contacts,setContacts]=useState([]);
+  const [kategorien,setKategorien]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [search,setSearch]=useState('');
+  const [filterKat,setFilterKat]=useState('');
+  const [formItem,setFormItem]=useState(null);
+  const [detail,setDetail]=useState(null);
+  const [confirmDel,setConfirmDel]=useState(null);
+  const [deleting,setDeleting]=useState(false);
+  const [currentUserId,setCurrentUserId]=useState(null);
+
+  const reload=()=>{
+    db.from('crm_contacts_overview').select('*').order('nachname')
+      .then(({data})=>{ setContacts(data||[]); setLoading(false); });
+  };
+
+  useEffect(()=>{
+    db.auth.getUser().then(({data:{user}})=>setCurrentUserId(user?.id||null));
+    db.from('crm_kategorien').select('*').order('sort_order').then(({data})=>setKategorien(data||[]));
+    reload();
+  },[]);
+
+  const filtered=useMemo(()=>contacts.filter(c=>{
+    if(filterKat&&c.kategorie_id!==filterKat)return false;
+    if(search){const q=search.toLowerCase();if(![c.vorname,c.nachname,c.firma,c.funktion,c.email].filter(Boolean).join(' ').toLowerCase().includes(q))return false;}
+    return true;
+  }),[contacts,search,filterKat]);
+
+  const handleSave=async(payload,isEdit)=>{
+    const targetId=isEdit?(detail?.id||formItem?.id):null;
+    if(isEdit&&targetId){
+      const{error}=await db.from('crm_contacts').update(payload).eq('id',targetId);
+      if(error) return error.message;
+    }else{
+      const{error}=await db.from('crm_contacts').insert(payload);
+      if(error) return error.message;
+    }
+    reload();
+    return null;
+  };
+
+  const handleDelete=async id=>{
+    setDeleting(true);
+    await db.from('crm_contacts').delete().eq('id',id);
+    setContacts(prev=>prev.filter(x=>x.id!==id));
+    setDetail(null); setDeleting(false); setConfirmDel(null);
+  };
+
+  // Stats by category
+  const byKat=useMemo(()=>{
+    const m={};
+    contacts.forEach(c=>{ if(c.kategorie_id) m[c.kategorie_id]=(m[c.kategorie_id]||0)+1; });
+    return m;
+  },[contacts]);
+
+  return <>
+    {/* Summary stats */}
+    {contacts.length>0&&<div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:20}}>
+      <div style={{background:'#fff',border:'1px solid var(--nfg-line)',borderRadius:12,padding:'12px 18px',textAlign:'center',minWidth:90}}>
+        <div style={{fontSize:26,fontWeight:700}}>{contacts.length}</div>
+        <div style={{fontSize:11,fontWeight:700,color:'#666',textTransform:'uppercase',letterSpacing:'0.04em'}}>Kontakte</div>
+      </div>
+      {kategorien.filter(k=>byKat[k.id]).map(k=><div key={k.id} style={{background:(k.farbe||'#6b7280')+'15',border:`1.5px solid ${k.farbe||'#6b7280'}40`,borderRadius:12,padding:'12px 18px',textAlign:'center',minWidth:80}}>
+        <div style={{fontSize:22,fontWeight:700,color:k.farbe||'#6b7280'}}>{byKat[k.id]}</div>
+        <div style={{fontSize:11,fontWeight:700,color:k.farbe||'#6b7280',textTransform:'uppercase',letterSpacing:'0.04em'}}>{k.name}</div>
+      </div>)}
+    </div>}
+
+    <div className="nfg-admin-bar" style={{marginBottom:16}}>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+        <div style={{position:'relative'}}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)'}}><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input className="nfg-input" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Name, Firma, E-Mail…" style={{paddingLeft:36,width:220}}/>
+        </div>
+        <select className="nfg-select" value={filterKat} onChange={e=>setFilterKat(e.target.value)} style={{minWidth:160}}>
+          <option value="">Alle Kategorien</option>
+          {kategorien.map(k=><option key={k.id} value={k.id}>{k.name}</option>)}
+        </select>
+      </div>
+      <button className="nfg-btn-primary" onClick={()=>setFormItem(false)}>+ Neuer Kontakt</button>
+    </div>
+
+    {loading&&<div style={{padding:'32px 0',textAlign:'center',color:'#666'}}>Laden…</div>}
+    {!loading&&filtered.length===0&&<div className="nfg-empty">{contacts.length===0?'Noch keine Kontakte. Füge den ersten Kontakt hinzu.':'Keine Treffer. Filter anpassen.'}</div>}
+
+    <div className="nfg-admin-list">
+      {filtered.map(c=>{
+        const kat=kategorien.find(k=>k.id===c.kategorie_id);
+        const initials=(c.vorname.charAt(0)+c.nachname.charAt(0)).toUpperCase();
+        return <div key={c.id} className="nfg-admin-item" style={{cursor:'pointer'}} onClick={()=>setDetail(c)}>
+          <div className="nfg-avatar" style={{width:38,height:38,fontSize:13,flexShrink:0,background:kat?.farbe||'#6b7280',color:'#fff'}}>{initials}</div>
+          <div className="nfg-admin-info">
+            <div className="nfg-admin-name" style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+              {c.vorname} {c.nachname}
+              {c.kategorie_id&&<KatBadge katId={c.kategorie_id} kategorien={kategorien}/>}
+              {!c.einwilligung&&<span style={{fontSize:10,color:'#b45309',background:'#fef3c7',borderRadius:4,padding:'1px 6px',fontWeight:700}}>⚠ DSG</span>}
+            </div>
+            <div className="nfg-admin-meta">
+              {[c.funktion,c.firma].filter(Boolean).join(' · ')}
+              {c.email&&<span style={{color:'#999'}}>{[c.funktion||c.firma?' · ':null,c.email].filter(Boolean).join('')}</span>}
+            </div>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3,flexShrink:0,fontSize:11,color:'#aaa',textAlign:'right'}}>
+            {c.anzahl_interaktionen>0&&<span style={{background:'#f0f0f0',borderRadius:6,padding:'2px 8px',fontWeight:700,color:'#444',fontSize:12}}>{c.anzahl_interaktionen}×</span>}
+            {c.letzte_interaktion&&<span>{fmtDate(c.letzte_interaktion)}</span>}
+          </div>
+        </div>;
+      })}
+    </div>
+
+    {formItem!==null&&<CrmKontaktFormModal initial={formItem||null} kategorien={kategorien} onClose={()=>setFormItem(null)} onSave={handleSave}/>}
+
+    {detail&&<CrmKontaktDetail
+      contact={detail} kategorien={kategorien} events={events} currentUserId={currentUserId}
+      onClose={()=>setDetail(null)}
+      onEdit={c=>{setDetail(null);setFormItem(c);}}
+      onDelete={c=>{setDetail(null);setConfirmDel(c);}}
+    />}
+
+    {confirmDel&&<div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&setConfirmDel(null)}>
+      <div className="nfg-form-sheet" style={{maxWidth:420}}>
+        <h3 style={{margin:'0 0 12px',fontSize:20,fontWeight:700}}>Kontakt löschen?</h3>
+        <p style={{margin:'0 0 24px',color:'#666',fontSize:14}}>„{confirmDel.vorname} {confirmDel.nachname}" und alle Interaktionen werden dauerhaft entfernt.</p>
+        <div style={{display:'flex',gap:10}}>
+          <button className="nfg-btn-primary" style={{background:'#e53e3e',borderColor:'#e53e3e',color:'#fff'}} disabled={deleting} onClick={()=>handleDelete(confirmDel.id)}>{deleting?'Löschen…':'Endgültig löschen'}</button>
+          <button className="nfg-btn-ghost" onClick={()=>setConfirmDel(null)}>Abbrechen</button>
+        </div>
+      </div>
+    </div>}
+  </>;
+}
+
 // ── Verwalten page ─────────────────────────────────────────────
 // ── Analytics ─────────────────────────────────────────────────
 function MiniChart({data}) {
@@ -2522,7 +2910,7 @@ function VerwaltenPage({listings,setListings,currentUserId,events,setEvents,maga
   return <div className="nfg-page">
     <h2 className="nfg-page-h">Verwalten</h2>
     <div style={{display:'flex',gap:4,marginBottom:24,background:'#f0f0f0',borderRadius:12,padding:4,width:'fit-content',flexWrap:'wrap'}}>
-      {[['betriebe','Betriebe'],['events','Events'],['magazin','Magazin'],['user','User'],['analytics','Analytics'],['typen','Typen'],['tags','Tags'],['sprache','Sprache']].map(([id,lbl])=>
+      {[['betriebe','Betriebe'],['events','Events'],['magazin','Magazin'],['kontakte','Kontakte'],['user','User'],['analytics','Analytics'],['typen','Typen'],['tags','Tags'],['sprache','Sprache']].map(([id,lbl])=>
         <button key={id} onClick={()=>setVtab(id)} style={{border:'none',borderRadius:9,padding:'8px 20px',fontFamily:'inherit',fontSize:14,fontWeight:700,cursor:'pointer',background:vtab===id?'#000':'transparent',color:vtab===id?'#fff':'#666',transition:'all 0.15s'}}>
           {lbl}
         </button>
@@ -2534,6 +2922,7 @@ function VerwaltenPage({listings,setListings,currentUserId,events,setEvents,maga
     {vtab==='user'     &&<UserTab currentUserId={currentUserId}/>}
     {vtab==='analytics'&&<AnalyticsTab listings={listings} events={events} magazine={magazine}/>}
     {vtab==='typen'    &&<TypenTab dbTypes={dbTypes} setDbTypes={setDbTypes}/>}
+    {vtab==='kontakte' &&<CrmTab events={events}/>}
     {vtab==='tags'     &&<TagsTab dbTags={dbTags} setDbTags={setDbTags}/>}
     {vtab==='sprache'  &&<SprachTab/>}
   </div>;
