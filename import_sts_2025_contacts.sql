@@ -315,14 +315,14 @@ VALUES (
   NULL, 'Medienpartnerschaft angefragt', FALSE
 ) ON CONFLICT DO NOTHING;
 INSERT INTO crm_contacts
-  (id, vorname, nachname, email, unternehmen_id, kategorie_id,
+  (id, vorname, nachname, email, telefon, unternehmen_id, kategorie_id,
    notizen, zuletzt_kontakt, anfrage_verschickt, pm_geschickt,
    nachgehakt, themen, do_not_contact)
 VALUES (
   'bedb0b20-32d6-45a2-a2ae-5f7b3bfded18',
-  'Sonja', 'Siegenthaler', 'sonja.siegenthaler@nzz.ch',
+  'Sonja', 'Siegenthaler', 'sonja.siegenthaler@nzz.ch', '+41 79 681 96 60',
   '73eaf85a-ebdb-4b2c-9319-ff9d6359d4bb', 'medien',
-  '768196660.0', '2025-09-02', TRUE, TRUE,
+  NULL, '2025-09-02', TRUE, TRUE,
   NULL, 'Lifestyle und Kulinarik', FALSE
 ) ON CONFLICT DO NOTHING;
 INSERT INTO crm_contacts
