@@ -808,8 +808,15 @@ function AuthModal({mode='login',hint,onClose,onAuth}) {
   const doLogin = async e => {
     e.preventDefault(); setErr(''); setLoading(true);
     const {data,error} = await db.auth.signInWithPassword({email:email.trim(),password:pw});
+    if (error) { setErr(error.message==='Invalid login credentials'?t('auth.wrong_creds','E-Mail oder Passwort falsch.'):error.message); setLoading(false); return; }
+    // is_blocked prüfen
+    const {data:profile} = await db.from('user_profiles').select('is_blocked').eq('id',data.user.id).single();
+    if (profile?.is_blocked) {
+      await db.auth.signOut();
+      setErr('Dein Account ist noch nicht freigeschaltet. Bitte wende dich an den Administrator.');
+      setLoading(false); return;
+    }
     setLoading(false);
-    if (error) { setErr(error.message==='Invalid login credentials'?t('auth.wrong_creds','E-Mail oder Passwort falsch.'):error.message); return; }
     onAuth(data.user); onClose();
   };
   const doRegister = async e => {
@@ -3886,8 +3893,13 @@ function App() {
 
   const loadRole=useCallback(async uid=>{
     if(!uid){setUserRole(null);return;}
-    const {data,error}=await db.from('user_profiles').select('role').eq('id',uid).limit(1);
+    const {data,error}=await db.from('user_profiles').select('role,is_blocked').eq('id',uid).limit(1);
     if(error||!data||data.length===0){setUserRole('user');return;}
+    if(data[0].is_blocked){
+      await db.auth.signOut();
+      setUser(null); setUserRole(null);
+      return;
+    }
     setUserRole(data[0].role||'user');
   },[]);
 
@@ -3896,12 +3908,22 @@ function App() {
     const check=()=>{ if(authDone) setReady(true); };
 
     db.auth.getSession().then(async ({data:{session}})=>{
+      // E-Mail-Bestätigung: access_token im Hash → ausloggen, Login zeigen
+      if(window.location.hash.includes('access_token')){
+        await db.auth.signOut();
+        window.history.replaceState(null,'',window.location.pathname);
+        setUser(null); setUserRole(null);
+        authDone=true; check();
+        setTimeout(()=>setAuthModal('login'),300);
+        return;
+      }
       const u=session?.user??null;
       setUser(u);
       await loadRole(u?.id??null);
       authDone=true; check();
     });
     const {data:{subscription}}=db.auth.onAuthStateChange((_e,session)=>{
+      if(window.location.hash.includes('access_token')) return; // wird oben behandelt
       const u=session?.user??null;
       setUser(u);
       loadRole(u?.id??null);
