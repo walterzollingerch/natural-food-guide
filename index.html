@@ -2841,14 +2841,17 @@ function CrmKontakteTab({events}) {
   return <>
     {/* Summary stats */}
     {contacts.length>0&&<div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:20}}>
-      <div style={{background:'#fff',border:'1px solid var(--nfg-line)',borderRadius:12,padding:'12px 18px',textAlign:'center',minWidth:90}}>
-        <div style={{fontSize:26,fontWeight:700}}>{contacts.length}</div>
-        <div style={{fontSize:11,fontWeight:700,color:'#666',textTransform:'uppercase',letterSpacing:'0.04em'}}>Kontakte</div>
+      <div onClick={()=>setFilterKat('')} style={{background:filterKat===''?'#1a1a1a':'#fff',border:`1px solid ${filterKat===''?'#1a1a1a':'var(--nfg-line)'}`,borderRadius:12,padding:'12px 18px',textAlign:'center',minWidth:90,cursor:'pointer',transition:'all .15s'}}>
+        <div style={{fontSize:26,fontWeight:700,color:filterKat===''?'#fff':'#1a1a1a'}}>{contacts.length}</div>
+        <div style={{fontSize:11,fontWeight:700,color:filterKat===''?'#aaa':'#666',textTransform:'uppercase',letterSpacing:'0.04em'}}>Kontakte</div>
       </div>
-      {kategorien.filter(k=>byKat[k.id]).map(k=><div key={k.id} style={{background:(k.farbe||'#6b7280')+'15',border:`1.5px solid ${k.farbe||'#6b7280'}40`,borderRadius:12,padding:'12px 18px',textAlign:'center',minWidth:80}}>
-        <div style={{fontSize:22,fontWeight:700,color:k.farbe||'#6b7280'}}>{byKat[k.id]}</div>
-        <div style={{fontSize:11,fontWeight:700,color:k.farbe||'#6b7280',textTransform:'uppercase',letterSpacing:'0.04em'}}>{k.name}</div>
-      </div>)}
+      {kategorien.filter(k=>byKat[k.id]).map(k=>{
+        const active=filterKat===k.id;
+        return <div key={k.id} onClick={()=>setFilterKat(active?'':k.id)} style={{background:active?(k.farbe||'#6b7280'):(k.farbe||'#6b7280')+'15',border:`1.5px solid ${k.farbe||'#6b7280'}${active?'':'40'}`,borderRadius:12,padding:'12px 18px',textAlign:'center',minWidth:80,cursor:'pointer',transition:'all .15s'}}>
+          <div style={{fontSize:22,fontWeight:700,color:active?'#fff':k.farbe||'#6b7280'}}>{byKat[k.id]}</div>
+          <div style={{fontSize:11,fontWeight:700,color:active?'#fff':k.farbe||'#6b7280',textTransform:'uppercase',letterSpacing:'0.04em'}}>{k.name}</div>
+        </div>;
+      })}
     </div>}
 
     <div className="nfg-admin-bar" style={{marginBottom:16}}>
