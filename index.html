@@ -313,6 +313,7 @@ body { background: var(--nfg-bg); font-family: var(--nfg-sans); color: var(--nfg
 <div id="root"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
@@ -3802,6 +3803,7 @@ function AktivitaetUebersicht() {
   const [teilnehmer, setTeilnehmer] = useState([]);
   const [kontakte, setKontakte]   = useState([]);
   const [loading, setLoading]     = useState(false);
+  const [selectedGruppe, setSelectedGruppe] = useState(null); // null = alle
 
   // Lade alle Aktivitäten für Dropdown
   useEffect(() => {
@@ -3809,7 +3811,6 @@ function AktivitaetUebersicht() {
       .order('datum_von', {ascending: false, nullsFirst: false})
       .then(({data}) => {
         setAktivitaeten(data || []);
-        // Auto-select erste nicht-abgeschlossene
         const first = (data||[]).find(a => a.status !== 'abgeschlossen' && a.status !== 'abgesagt');
         if (first) setSelectedId(first.id);
       });
@@ -3817,27 +3818,27 @@ function AktivitaetUebersicht() {
 
   // Lade Detail wenn ID wechselt
   useEffect(() => {
-    if (!selectedId) { setAkt(null); setTeilnehmer([]); setKontakte([]); return; }
+    if (!selectedId) { setAkt(null); setTeilnehmer([]); setKontakte([]); setSelectedGruppe(null); return; }
     setLoading(true);
-    Promise.all([
-      db.from('crm_aktivitaeten').select('*').eq('id', selectedId).single(),
-      db.from('crm_unternehmen_aktivitaeten').select('*,crm_unternehmen(*)').eq('aktivitaet_id', selectedId),
-      db.from('crm_contacts_overview').select('id,vorname,nachname,funktion,email,telefon,kategorie_id,kategorie_farbe,kategorie_name,unternehmen_id,unternehmen_name,anfrage_verschickt,pm_geschickt,nachgehakt,do_not_contact').eq('unternehmen_id.in', '(select unternehmen_id from crm_unternehmen_aktivitaeten where aktivitaet_id=\'' + selectedId + '\')')
-    ]).then(([{data: a}, {data: t}]) => {
-      setAkt(a);
-      setTeilnehmer(t || []);
-      setLoading(false);
-      // Lade Kontakte für teilnehmende Unternehmen
-      const untIds = (t||[]).map(x => x.unternehmen_id);
-      if (untIds.length > 0) {
-        db.from('crm_contacts_overview')
-          .select('id,vorname,nachname,funktion,email,telefon,kategorie_id,kategorie_farbe,kategorie_name,unternehmen_id,unternehmen_name,anfrage_verschickt,pm_geschickt,nachgehakt,do_not_contact')
-          .in('unternehmen_id', untIds)
-          .then(({data: c}) => setKontakte(c || []));
-      } else {
-        setKontakte([]);
-      }
-    });
+    setSelectedGruppe(null);
+    db.from('crm_aktivitaeten').select('*').eq('id', selectedId).single()
+      .then(({data: a}) => {
+        setAkt(a);
+        return db.from('crm_unternehmen_aktivitaeten').select('*,crm_unternehmen(*)').eq('aktivitaet_id', selectedId);
+      })
+      .then(({data: t}) => {
+        setTeilnehmer(t || []);
+        setLoading(false);
+        const untIds = (t||[]).map(x => x.unternehmen_id);
+        if (untIds.length > 0) {
+          db.from('crm_contacts_overview')
+            .select('id,vorname,nachname,funktion,email,telefon,kategorie_id,kategorie_farbe,kategorie_name,unternehmen_id,unternehmen_name,anfrage_verschickt,pm_geschickt,nachgehakt,do_not_contact')
+            .in('unternehmen_id', untIds)
+            .then(({data: c}) => setKontakte(c || []));
+        } else {
+          setKontakte([]);
+        }
+      });
   }, [selectedId]);
 
   const sichtbar = aktivitaeten.filter(a =>
@@ -3846,13 +3847,140 @@ function AktivitaetUebersicht() {
 
   const typ = akt ? (AKT_TYP[akt.typ] || AKT_TYP.sonstiges) : null;
 
-  // Stats
+  // Stats (immer über alle Daten)
   const zugesagt  = teilnehmer.filter(t => t.zusage_status === 'ja').length;
   const abgesagt  = teilnehmer.filter(t => t.zusage_status === 'Absage').length;
   const offen     = teilnehmer.length - zugesagt - abgesagt;
   const pmCount   = kontakte.filter(c => c.pm_geschickt).length;
   const anfCount  = kontakte.filter(c => c.anfrage_verschickt).length;
   const dncCount  = kontakte.filter(c => c.do_not_contact).length;
+
+  // Gefilterte Teilnehmer/Kontakte je nach selectedGruppe
+  const filteredTeilnehmer = React.useMemo(() => {
+    if (!selectedGruppe) return teilnehmer;
+    if (selectedGruppe === 'zugesagt') return teilnehmer.filter(t => t.zusage_status === 'ja');
+    if (selectedGruppe === 'absage')   return teilnehmer.filter(t => t.zusage_status === 'Absage');
+    if (selectedGruppe === 'offen')    return teilnehmer.filter(t => t.zusage_status !== 'ja' && t.zusage_status !== 'Absage');
+    if (selectedGruppe === 'anfrage') {
+      const ids = new Set(kontakte.filter(c => c.anfrage_verschickt).map(c => c.unternehmen_id));
+      return teilnehmer.filter(t => ids.has(t.unternehmen_id));
+    }
+    if (selectedGruppe === 'pm') {
+      const ids = new Set(kontakte.filter(c => c.pm_geschickt).map(c => c.unternehmen_id));
+      return teilnehmer.filter(t => ids.has(t.unternehmen_id));
+    }
+    if (selectedGruppe === 'dnc') {
+      const ids = new Set(kontakte.filter(c => c.do_not_contact).map(c => c.unternehmen_id));
+      return teilnehmer.filter(t => ids.has(t.unternehmen_id));
+    }
+    return teilnehmer;
+  }, [teilnehmer, kontakte, selectedGruppe]);
+
+  const filteredKontakte = React.useMemo(() => {
+    const ids = new Set(filteredTeilnehmer.map(t => t.unternehmen_id));
+    return kontakte.filter(c => ids.has(c.unternehmen_id));
+  }, [kontakte, filteredTeilnehmer]);
+
+  // PDF-Export
+  const exportPDF = () => {
+    const aktTitel = akt ? akt.titel : 'Übersicht';
+    const gruppeLabel = selectedGruppe
+      ? ({zugesagt:'Zugesagt',absage:'Absagen',offen:'Offen',anfrage:'Anfragen',pm:'PM verschickt',dnc:'Do Not Contact'}[selectedGruppe] || selectedGruppe)
+      : 'Alle';
+    const rows = filteredTeilnehmer.map(t => {
+      const u = t.crm_unternehmen || {};
+      const ks = filteredKontakte.filter(c => c.unternehmen_id === t.unternehmen_id);
+      return `
+        <tr style="background:#f9f9f9">
+          <td style="padding:8px 10px;font-weight:700;border-bottom:1px solid #e5e7eb" colspan="5">${u.name||'–'}${u.mediengruppe?` <span style="font-weight:400;color:#888;font-size:12px">(${u.mediengruppe})</span>`:''}
+            ${t.zusage_status?`<span style="font-size:11px;padding:2px 8px;border-radius:999px;margin-left:8px;background:${t.zusage_status==='ja'?'#dcfce7':t.zusage_status==='Absage'?'#fee2e2':'#fef9c3'};color:${t.zusage_status==='ja'?'#166534':t.zusage_status==='Absage'?'#b91c1c':'#92400e'}">${t.zusage_status}</span>`:''}
+          </td>
+        </tr>
+        ${ks.map(c => `<tr>
+          <td style="padding:5px 10px 5px 22px;border-bottom:1px solid #f3f4f6">${c.vorname} ${c.nachname}</td>
+          <td style="padding:5px 10px;border-bottom:1px solid #f3f4f6;color:#888">${c.funktion||'–'}</td>
+          <td style="padding:5px 10px;border-bottom:1px solid #f3f4f6;color:#3b82f6">${c.email||'–'}</td>
+          <td style="padding:5px 10px;border-bottom:1px solid #f3f4f6">${c.telefon||'–'}</td>
+          <td style="padding:5px 10px;border-bottom:1px solid #f3f4f6;font-size:11px">
+            ${c.anfrage_verschickt?'<span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:4px;margin-right:3px">Anfrage ✓</span>':''}
+            ${c.pm_geschickt?'<span style="background:#eff6ff;color:#1d4ed8;padding:1px 6px;border-radius:4px;margin-right:3px">PM ✓</span>':''}
+            ${c.do_not_contact?'<span style="background:#fee2e2;color:#b91c1c;padding:1px 6px;border-radius:4px">⛔ DNC</span>':''}
+          </td>
+        </tr>`).join('')}`;
+    }).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+      <title>${aktTitel} – ${gruppeLabel}</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:24px;color:#111}
+        h1{font-size:20px;margin-bottom:4px}
+        .sub{font-size:13px;color:#555;margin-bottom:20px}
+        table{width:100%;border-collapse:collapse;font-size:13px}
+        th{background:#1a1a1a;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+        @media print{@page{margin:15mm}}
+      </style></head><body>
+      <h1>${aktTitel}</h1>
+      <div class="sub">Filter: <strong>${gruppeLabel}</strong> · ${filteredTeilnehmer.length} Unternehmen · ${filteredKontakte.length} Kontakte · Exportiert ${new Date().toLocaleDateString('de-CH')}</div>
+      <table>
+        <thead><tr><th>Name</th><th>Funktion</th><th>E-Mail</th><th>Telefon</th><th>Status</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <script>window.onload=function(){window.print();}<\/script>
+    </body></html>`;
+    const w = window.open('', '_blank');
+    if (w) { w.document.write(html); w.document.close(); }
+  };
+
+  // Excel-Export mit SheetJS
+  const exportExcel = () => {
+    if (typeof XLSX === 'undefined') { alert('SheetJS noch nicht geladen – bitte Seite neu laden.'); return; }
+    const aktTitel = akt ? akt.titel : 'Uebersicht';
+
+    // Sheet 1: Unternehmen
+    const untRows = filteredTeilnehmer.map(t => {
+      const u = t.crm_unternehmen || {};
+      return {
+        'Unternehmen': u.name || '',
+        'Mediengruppe': u.mediengruppe || '',
+        'Medientyp': u.medientyp || '',
+        'Zusage-Status': t.zusage_status || '',
+        'Rolle': t.rolle || '',
+        'Website': u.website || '',
+        'Adresse': u.adresse || '',
+      };
+    });
+
+    // Sheet 2: Kontakte
+    const ktRows = filteredKontakte.map(c => ({
+      'Vorname': c.vorname || '',
+      'Nachname': c.nachname || '',
+      'Funktion': c.funktion || '',
+      'E-Mail': c.email || '',
+      'Telefon': c.telefon || '',
+      'Unternehmen': c.unternehmen_name || '',
+      'Anfrage verschickt': c.anfrage_verschickt ? 'Ja' : '',
+      'PM verschickt': c.pm_geschickt ? 'Ja' : '',
+      'Nachgehakt': c.nachgehakt || '',
+      'Do Not Contact': c.do_not_contact ? 'Ja' : '',
+    }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(untRows.length ? untRows : [{}]), 'Unternehmen');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ktRows.length ? ktRows : [{}]), 'Kontakte');
+    XLSX.writeFile(wb, `${aktTitel.replace(/[^a-zA-Z0-9_-]/g,'_')}_Export.xlsx`);
+  };
+
+  // KPI-Karten Konfiguration (key=null bedeutet: Auswahl aufheben)
+  const kpiCards = [
+    {key: null,        n: teilnehmer.length, lbl:'Unternehmen',    bg:'#f0f9ff', col:'#0369a1'},
+    {key: null,        n: kontakte.length,   lbl:'Kontakte',       bg:'#f5f3ff', col:'#6d28d9'},
+    {key: 'zugesagt',  n: zugesagt,          lbl:'Zugesagt',       bg:'#dcfce7', col:'#166534'},
+    {key: 'absage',    n: abgesagt,          lbl:'Absagen',        bg:'#fee2e2', col:'#b91c1c'},
+    {key: 'offen',     n: offen,             lbl:'Offen',          bg:'#fef9c3', col:'#92400e'},
+    {key: 'anfrage',   n: anfCount,          lbl:'Anfragen',       bg:'#f0fdf4', col:'#15803d'},
+    {key: 'pm',        n: pmCount,           lbl:'PM verschickt',  bg:'#fff7ed', col:'#c2410c'},
+    {key: 'dnc',       n: dncCount,          lbl:'Do Not Contact', bg:'#fafafa', col:'#ef4444'},
+  ];
 
   return <div className="nfg-page">
     <h2 className="nfg-page-h">Übersicht</h2>
@@ -3885,7 +4013,7 @@ function AktivitaetUebersicht() {
       {/* Header Aktivität */}
       <div style={{background:'#fff',border:'1px solid var(--nfg-line)',borderRadius:16,padding:'20px 24px',marginBottom:20}}>
         <div style={{display:'flex',gap:10,alignItems:'flex-start',flexWrap:'wrap',justifyContent:'space-between'}}>
-          <div>
+          <div style={{flex:1}}>
             <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
               <span style={{fontSize:24}}>{typ.icon}</span>
               <span style={{fontSize:12,fontWeight:700,color:typ.color,textTransform:'uppercase',letterSpacing:'0.06em'}}>{typ.label}</span>
@@ -3898,35 +4026,49 @@ function AktivitaetUebersicht() {
             </div>
             {akt.beschreibung && <p style={{margin:'10px 0 0',fontSize:13,color:'#555',lineHeight:1.6,maxWidth:600}}>{akt.beschreibung}</p>}
           </div>
+          {/* Export-Buttons */}
+          <div style={{display:'flex',gap:8,alignItems:'flex-start',flexShrink:0}}>
+            <button onClick={exportPDF} title="PDF exportieren"
+              style={{display:'flex',alignItems:'center',gap:6,padding:'8px 14px',borderRadius:8,border:'1.5px solid #e5e7eb',background:'#fff',color:'#374151',fontSize:13,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
+              📄 PDF
+            </button>
+            <button onClick={exportExcel} title="Excel exportieren"
+              style={{display:'flex',alignItems:'center',gap:6,padding:'8px 14px',borderRadius:8,border:'1.5px solid #e5e7eb',background:'#fff',color:'#374151',fontSize:13,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
+              📊 Excel
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* KPI-Karten */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:10,marginBottom:24}}>
-        {[
-          {n: teilnehmer.length, lbl:'Unternehmen', bg:'#f0f9ff', col:'#0369a1'},
-          {n: kontakte.length,   lbl:'Kontakte',    bg:'#f5f3ff', col:'#6d28d9'},
-          {n: zugesagt,          lbl:'Zugesagt',    bg:'#dcfce7', col:'#166534'},
-          {n: abgesagt,          lbl:'Absagen',     bg:'#fee2e2', col:'#b91c1c'},
-          {n: offen,             lbl:'Offen',       bg:'#fef9c3', col:'#92400e'},
-          {n: anfCount,          lbl:'Anfragen',    bg:'#f0fdf4', col:'#15803d'},
-          {n: pmCount,           lbl:'PM verschickt',bg:'#fff7ed',col:'#c2410c'},
-          {n: dncCount,          lbl:'Do Not Contact',bg:'#fafafa',col:'#ef4444'},
-        ].map(({n,lbl,bg,col}) =>
-          <div key={lbl} style={{background:bg,border:`1.5px solid ${col}25`,borderRadius:12,padding:'14px 16px',textAlign:'center'}}>
-            <div style={{fontSize:28,fontWeight:700,color:col,lineHeight:1}}>{n}</div>
-            <div style={{fontSize:10,fontWeight:700,color:col,textTransform:'uppercase',letterSpacing:'0.05em',marginTop:4}}>{lbl}</div>
-          </div>
-        )}
+      {/* KPI-Karten – klickbar */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:10,marginBottom:16}}>
+        {kpiCards.map(({key,n,lbl,bg,col}) => {
+          const isActive = key !== null && selectedGruppe === key;
+          return <div key={lbl} onClick={() => setSelectedGruppe(key !== null ? (selectedGruppe === key ? null : key) : null)}
+            style={{background: isActive ? col : bg, border:`1.5px solid ${col}${isActive?'':'25'}`, borderRadius:12,
+              padding:'14px 16px', textAlign:'center', cursor: key !== null ? 'pointer' : 'default',
+              transition:'all 0.15s', boxShadow: isActive ? `0 2px 8px ${col}44` : 'none',
+              userSelect:'none'}}>
+            <div style={{fontSize:28,fontWeight:700,color: isActive ? '#fff' : col,lineHeight:1}}>{n}</div>
+            <div style={{fontSize:10,fontWeight:700,color: isActive ? 'rgba(255,255,255,0.9)' : col,
+              textTransform:'uppercase',letterSpacing:'0.05em',marginTop:4}}>{lbl}</div>
+          </div>;
+        })}
       </div>
 
+      {/* Filter-Hinweis */}
+      {selectedGruppe && <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,padding:'8px 14px',background:'#f0f9ff',borderRadius:8,fontSize:13,color:'#0369a1',border:'1px solid #bae6fd'}}>
+        <span>🔍 Gefiltert nach: <strong>{{zugesagt:'Zugesagt',absage:'Absagen',offen:'Offen',anfrage:'Anfragen',pm:'PM verschickt',dnc:'Do Not Contact'}[selectedGruppe]}</strong> — {filteredTeilnehmer.length} Unternehmen · {filteredKontakte.length} Kontakte</span>
+        <button onClick={() => setSelectedGruppe(null)} style={{marginLeft:'auto',background:'none',border:'none',cursor:'pointer',color:'#0369a1',fontSize:13,fontWeight:600,padding:'2px 6px'}}>✕ Filter aufheben</button>
+      </div>}
+
       {/* Teilnehmende Unternehmen */}
-      {teilnehmer.length > 0 && <section style={{marginBottom:24}}>
-        <h3 style={{fontSize:16,fontWeight:700,margin:'0 0 12px'}}>🏢 Teilnehmende Unternehmen ({teilnehmer.length})</h3>
+      {filteredTeilnehmer.length > 0 && <section style={{marginBottom:24}}>
+        <h3 style={{fontSize:16,fontWeight:700,margin:'0 0 12px'}}>🏢 Teilnehmende Unternehmen ({filteredTeilnehmer.length})</h3>
         <div style={{display:'flex',flexDirection:'column',gap:6}}>
-          {teilnehmer.map(t => {
+          {filteredTeilnehmer.map(t => {
             const u = t.crm_unternehmen; if (!u) return null;
-            const untKontakte = kontakte.filter(c => c.unternehmen_id === t.unternehmen_id);
+            const untKontakte = filteredKontakte.filter(c => c.unternehmen_id === t.unternehmen_id);
             const statusColor = t.zusage_status === 'ja' ? '#166534' : t.zusage_status === 'Absage' ? '#b91c1c' : '#92400e';
             const statusBg    = t.zusage_status === 'ja' ? '#dcfce7' : t.zusage_status === 'Absage' ? '#fee2e2' : '#fef9c3';
             return <div key={t.unternehmen_id} style={{background:'#fff',border:'1px solid var(--nfg-line)',borderRadius:12,padding:'12px 16px'}}>
@@ -3963,6 +4105,7 @@ function AktivitaetUebersicht() {
         </div>
       </section>}
 
+      {filteredTeilnehmer.length === 0 && teilnehmer.length > 0 && <div className="nfg-empty">Keine Einträge für diesen Filter.</div>}
       {teilnehmer.length === 0 && <div className="nfg-empty">Noch keine Unternehmen mit dieser Aktivität verknüpft.</div>}
     </>}
   </div>;
