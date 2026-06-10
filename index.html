@@ -3014,7 +3014,8 @@ function CrmTab({events}){
     {id:'kontakte',    label:'Kontakte',    icon:'👤'},
     {id:'unternehmen', label:'Unternehmen', icon:'🏢'},
     {id:'aktivitaeten',label:'Aktivitäten', icon:'📋'},
-    {id:'branchen',    label:'Branchen',    icon:'🏷'}
+    {id:'branchen',    label:'Branchen',    icon:'🏷'},
+    {id:'kategorien',  label:'Kategorien',  icon:'🎨'}
   ];
   return <div>
     <div style={{display:'flex',gap:4,marginBottom:24,borderBottom:'2px solid var(--nfg-line)',paddingBottom:0,flexWrap:'wrap'}}>
@@ -3028,6 +3029,7 @@ function CrmTab({events}){
     {subTab==='unternehmen' &&<CrmUnternehmenTab/>}
     {subTab==='aktivitaeten'&&<CrmAktivitaetenTab/>}
     {subTab==='branchen'    &&<CrmBranchenTab/>}
+    {subTab==='kategorien'  &&<CrmKategorienTab/>}
   </div>;
 }
 
@@ -3534,6 +3536,133 @@ function CrmBranchenTab(){
       <div className="nfg-form-sheet" style={{maxWidth:380}}>
         <h3 style={{margin:'0 0 8px',fontSize:18,fontWeight:700}}>Branche löschen?</h3>
         <p style={{margin:'0 0 20px',color:'#666',fontSize:14}}>„{confirmDel.name}" wird dauerhaft entfernt. Bestehende Unternehmen behalten den Branchennamen als Text.</p>
+        <div style={{display:'flex',gap:10}}>
+          <button className="nfg-btn-primary" style={{background:'#dc2626',borderColor:'#dc2626'}} onClick={()=>handleDelete(confirmDel.id)}>Löschen</button>
+          <button className="nfg-btn-ghost" onClick={()=>setConfirmDel(null)}>Abbrechen</button>
+        </div>
+      </div>
+    </div>}
+  </>;
+}
+
+// ── CRM Kategorien Tab ────────────────────────────────────────
+function CrmKategorienTab(){
+  const [list,setList]=useState([]);
+  const [counts,setCounts]=useState({}); // {kategorie_id: count}
+  const [loading,setLoading]=useState(true);
+  const [editItem,setEditItem]=useState(null);
+  const [f,setF]=useState({name:'',farbe:'#6b7280'});
+  const [saving,setSaving]=useState(false);
+  const [err,setErr]=useState('');
+  const [confirmDel,setConfirmDel]=useState(null);
+
+  const reload=()=>{
+    setLoading(true);
+    Promise.all([
+      db.from('crm_kategorien').select('*').order('sort_order').order('name'),
+      db.from('crm_contacts').select('kategorie_id').not('kategorie_id','is',null)
+    ]).then(([{data:kats},{data:contacts}])=>{
+      setList(kats||[]);
+      const c={};
+      (contacts||[]).forEach(x=>{ c[x.kategorie_id]=(c[x.kategorie_id]||0)+1; });
+      setCounts(c);
+      setLoading(false);
+    });
+  };
+  useEffect(()=>{ reload(); },[]);
+
+  const openNew=()=>{ setF({name:'',farbe:'#6b7280'}); setErr(''); setEditItem({}); };
+  const openEdit=k=>{ setF({name:k.name,farbe:k.farbe||'#6b7280'}); setErr(''); setEditItem(k); };
+
+  const handleSave=async e=>{
+    e.preventDefault(); setErr('');
+    if(!f.name.trim()){setErr('Name erforderlich.');return;}
+    setSaving(true);
+    if(editItem?.id){
+      const{error}=await db.from('crm_kategorien').update({name:f.name.trim(),farbe:f.farbe}).eq('id',editItem.id);
+      if(error){setErr(error.message);setSaving(false);return;}
+    } else {
+      const{error}=await db.from('crm_kategorien').insert({name:f.name.trim(),farbe:f.farbe,sort_order:list.length});
+      if(error){setErr(error.message);setSaving(false);return;}
+    }
+    setSaving(false); setEditItem(null); reload();
+  };
+
+  const handleDelete=async id=>{
+    await db.from('crm_kategorien').delete().eq('id',id);
+    setList(prev=>prev.filter(x=>x.id!==id)); setCounts(prev=>{const c={...prev};delete c[id];return c;}); setConfirmDel(null);
+  };
+
+  const FARBEN=['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#ec4899','#14b8a6','#f97316','#6b7280','#1a1a1a'];
+
+  return <>
+    <div className="nfg-admin-bar" style={{marginBottom:16}}>
+      <p className="nfg-page-sub" style={{margin:0}}>{list.length} Kategorien</p>
+      <button className="nfg-btn-primary" onClick={openNew}>+ Neue Kategorie</button>
+    </div>
+    {loading&&<div style={{padding:'32px 0',textAlign:'center',color:'#666'}}>Laden…</div>}
+    {!loading&&list.length===0&&<div className="nfg-empty">Noch keine Kategorien. Füge die erste hinzu.</div>}
+    <div className="nfg-admin-list">
+      {list.map(k=>{
+        const n=counts[k.id]||0;
+        return <div key={k.id} className="nfg-admin-item">
+          <div style={{width:12,height:36,borderRadius:6,background:k.farbe||'#6b7280',flexShrink:0}}/>
+          <div className="nfg-admin-info">
+            <div className="nfg-admin-name" style={{color:k.farbe||'#6b7280'}}>{k.name}</div>
+            <div className="nfg-admin-meta">{n} Kontakt{n!==1?'e':''}</div>
+          </div>
+          <div className="nfg-admin-actions">
+            <button className="nfg-btn-sm nfg-btn-sm-edit" onClick={()=>openEdit(k)}>Bearbeiten</button>
+            <button className="nfg-btn-sm nfg-btn-sm-del" onClick={()=>setConfirmDel(k)}
+              disabled={n>0} title={n>0?`Noch ${n} Kontakt${n!==1?'e':''} zugewiesen`:''}>Löschen</button>
+          </div>
+        </div>;
+      })}
+    </div>
+
+    {/* Form Modal */}
+    {editItem!==null&&<div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&setEditItem(null)}>
+      <div className="nfg-form-sheet" style={{maxWidth:400}}>
+        <button className="nfg-form-close" onClick={()=>setEditItem(null)}>×</button>
+        <h2 className="nfg-form-title">{editItem?.id?'Kategorie bearbeiten':'Neue Kategorie'}</h2>
+        <form onSubmit={handleSave}>
+          <div className="nfg-form-row one">
+            <label className="nfg-label">Name *
+              <input className="nfg-input" value={f.name} onChange={e=>setF(p=>({...p,name:e.target.value}))} placeholder="z.B. Journalist" required/>
+            </label>
+          </div>
+          <div className="nfg-form-row one">
+            <label className="nfg-label">Farbe
+              <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:6}}>
+                {FARBEN.map(c=><button type="button" key={c} onClick={()=>setF(p=>({...p,farbe:c}))}
+                  style={{width:28,height:28,borderRadius:'50%',background:c,border:f.farbe===c?'3px solid #1a1a1a':'2px solid transparent',cursor:'pointer'}}/>)}
+                <input type="color" value={f.farbe} onChange={e=>setF(p=>({...p,farbe:e.target.value}))}
+                  style={{width:28,height:28,borderRadius:'50%',border:'none',cursor:'pointer',padding:0}}/>
+              </div>
+            </label>
+          </div>
+          {/* Vorschau */}
+          {f.name&&<div style={{marginBottom:16}}>
+            <div style={{fontSize:11,fontWeight:600,color:'#888',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.05em'}}>Vorschau</div>
+            <span style={{display:'inline-flex',alignItems:'center',gap:6,padding:'4px 12px',borderRadius:999,
+              background:f.farbe+'20',color:f.farbe,border:`1.5px solid ${f.farbe}50`,fontSize:13,fontWeight:700}}>
+              {f.name}
+            </span>
+          </div>}
+          {err&&<p style={{color:'#e53e3e',fontSize:13,margin:'4px 0 12px'}}>{err}</p>}
+          <div style={{display:'flex',gap:10}}>
+            <button type="submit" className="nfg-btn-primary" disabled={saving}>{saving?'Speichern…':'Speichern'}</button>
+            <button type="button" className="nfg-btn-ghost" onClick={()=>setEditItem(null)}>Abbrechen</button>
+          </div>
+        </form>
+      </div>
+    </div>}
+
+    {/* Löschen-Bestätigung */}
+    {confirmDel&&<div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&setConfirmDel(null)}>
+      <div className="nfg-form-sheet" style={{maxWidth:380}}>
+        <h3 style={{margin:'0 0 8px',fontSize:18,fontWeight:700}}>Kategorie löschen?</h3>
+        <p style={{margin:'0 0 20px',color:'#666',fontSize:14}}>„{confirmDel.name}" wird dauerhaft entfernt. Kontakte verlieren diese Kategorie-Zuweisung.</p>
         <div style={{display:'flex',gap:10}}>
           <button className="nfg-btn-primary" style={{background:'#dc2626',borderColor:'#dc2626'}} onClick={()=>handleDelete(confirmDel.id)}>Löschen</button>
           <button className="nfg-btn-ghost" onClick={()=>setConfirmDel(null)}>Abbrechen</button>
