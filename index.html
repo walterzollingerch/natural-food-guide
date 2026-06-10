@@ -332,6 +332,15 @@ window.SUPABASE_KEY         = 'sb_publishable_zUymXhSHnW3hJ0JSFPlUKQ_EsJdBq4J';
 window.SUPABASE_SERVICE_KEY = ''; // optional: Project Settings → API → service_role key (für User-Erstellung & -Löschung)
 window.NFG_CONFIGURED = !window.SUPABASE_URL.includes('YOUR_PROJECT_ID');
 
+/* ----------------------------------------------------------------
+   RESEND E-MAIL (optional — für Sperr-/Entsperr-Benachrichtigungen)
+   Eintrag unter https://resend.com → API Keys
+   RESEND_FROM muss eine verifizierte Absender-Adresse sein,
+   z.B. 'noreply@tomtalent.ch'
+   ---------------------------------------------------------------- */
+window.RESEND_API_KEY = ''; // z.B. 're_xxxxxxxxxxxxxxxx'
+window.RESEND_FROM    = 'Soil to Soul <noreply@tomtalent.ch>';
+
 /* ================================================================
    SQL SETUP — Einmalig im Supabase SQL Editor ausführen
    (supabase.com → Dein Projekt → SQL Editor → New query)
@@ -1862,11 +1871,61 @@ function UserTab({currentUserId}) {
     return null;
   };
 
+  const sendBlockMail=async(email,name,blocked)=>{
+    const key=window.RESEND_API_KEY;
+    if(!key) return; // Resend nicht konfiguriert → still ignorieren
+    const subject=blocked
+      ? 'Dein Account wurde gesperrt – Soil to Soul Mgt Tool'
+      : 'Dein Account wurde freigeschaltet – Soil to Soul Mgt Tool';
+    const bodyHtml=blocked
+      ? `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#fff">
+          <div style="background:#d2dc46;border-radius:10px;padding:20px 24px;margin-bottom:28px">
+            <span style="font-family:Arial Black,sans-serif;font-weight:900;font-size:18px">SOIL TO SOUL</span>
+            <span style="font-size:13px;color:#555;margin-left:8px">Mgt Tool</span>
+          </div>
+          <h2 style="margin:0 0 12px;font-size:20px">Dein Account wurde gesperrt</h2>
+          <p style="color:#444;line-height:1.6">Hallo${name?' '+name:''},</p>
+          <p style="color:#444;line-height:1.6">dein Konto beim <strong>Soil to Soul Mgt Tool</strong> wurde von einem Administrator <strong>gesperrt</strong> und ist vorübergehend nicht zugänglich.</p>
+          <p style="color:#444;line-height:1.6">Bitte wende dich an den Administrator, um weitere Informationen zu erhalten.</p>
+          <p style="color:#888;font-size:12px;margin-top:32px">Dies ist eine automatische Benachrichtigung.</p>
+        </div>`
+      : `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#fff">
+          <div style="background:#d2dc46;border-radius:10px;padding:20px 24px;margin-bottom:28px">
+            <span style="font-family:Arial Black,sans-serif;font-weight:900;font-size:18px">SOIL TO SOUL</span>
+            <span style="font-size:13px;color:#555;margin-left:8px">Mgt Tool</span>
+          </div>
+          <h2 style="margin:0 0 12px;font-size:20px">Dein Account ist jetzt aktiv</h2>
+          <p style="color:#444;line-height:1.6">Hallo${name?' '+name:''},</p>
+          <p style="color:#444;line-height:1.6">dein Konto beim <strong>Soil to Soul Mgt Tool</strong> wurde von einem Administrator <strong>freigeschaltet</strong>.</p>
+          <p style="margin:24px 0">
+            <a href="${window.location.origin}${window.location.pathname}" style="display:inline-block;padding:12px 28px;background:#1a1a1a;color:#d2dc46;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px">
+              Jetzt einloggen →
+            </a>
+          </p>
+          <p style="color:#888;font-size:12px;margin-top:32px">Dies ist eine automatische Benachrichtigung.</p>
+        </div>`;
+    try {
+      await fetch('https://api.resend.com/emails',{
+        method:'POST',
+        headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
+        body:JSON.stringify({from:window.RESEND_FROM||'noreply@tomtalent.ch',to:email,subject,html:bodyHtml})
+      });
+    } catch(e){ /* Mail-Fehler nicht blockieren */ }
+  };
+
+  const [blockMailStatus,setBlockMailStatus]=useState(null); // {name,blocked,ok}
+
   const handleToggleBlock=async u=>{
     const newVal=!u.is_blocked;
     setActionLoading(u.id);
     await db.from('user_profiles').update({is_blocked:newVal}).eq('id',u.id);
     setUsers(prev=>prev.map(x=>x.id===u.id?{...x,is_blocked:newVal}:x));
+    // Benachrichtigungs-Mail
+    if(u.email){
+      await sendBlockMail(u.email,u.name,newVal);
+      setBlockMailStatus({name:u.name||u.email,blocked:newVal});
+      setTimeout(()=>setBlockMailStatus(null),4000);
+    }
     setActionLoading(null);
   };
 
@@ -1902,6 +1961,15 @@ function UserTab({currentUserId}) {
     {/* Reset-Success-Banner */}
     {resetSuccess&&<div style={{marginBottom:12,padding:'10px 14px',borderRadius:8,background:'#dcfce7',border:'1px solid #bbf7d0',fontSize:13,color:'#166534'}}>
       ✓ Passwort-Reset-Link wurde an <strong>{resetSuccess}</strong> gesendet.
+    </div>}
+
+    {/* Sperr/Entsperr-Mail-Banner */}
+    {blockMailStatus&&<div style={{marginBottom:12,padding:'10px 14px',borderRadius:8,
+      background: blockMailStatus.blocked?'#fef3c7':'#dcfce7',
+      border:`1px solid ${blockMailStatus.blocked?'#fde68a':'#bbf7d0'}`,
+      fontSize:13,color: blockMailStatus.blocked?'#92400e':'#166534'}}>
+      {blockMailStatus.blocked?'🔒':'🔓'} <strong>{blockMailStatus.name}</strong> wurde {blockMailStatus.blocked?'gesperrt':'entsperrt'}
+      {window.RESEND_API_KEY?' — Benachrichtigung per E-Mail verschickt.':'.'}
     </div>}
 
     {/* Toolbar */}
