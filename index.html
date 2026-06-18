@@ -3124,13 +3124,13 @@ function CrmUnternehmenFormModal({initial,branchen,onClose,onSave}){
 
 // ── CRM Aktivität Form Modal ───────────────────────────────────
 const EMPTY_AKT={titel:'',typ:'event',beschreibung:'',datum_von:'',datum_bis:'',ort:'',status:'geplant',notizen:'',zeit_von:'',zeit_bis:''};
-function CrmAktivitaetFormModal({initial,onClose,onSave,parentId,parentTitel}){
+function CrmAktivitaetFormModal({initial,onClose,onSave,parentId,parentTitel,parentDatumVon,parentDatumBis}){
   const [f,setF]=useState(()=>initial?{
     titel:initial.titel||'',typ:initial.typ||'event',beschreibung:initial.beschreibung||'',
     datum_von:initial.datum_von||'',datum_bis:initial.datum_bis||'',ort:initial.ort||'',
     status:initial.status||'geplant',notizen:initial.notizen||'',
     zeit_von:initial.zeit_von||'',zeit_bis:initial.zeit_bis||''
-  }:{...EMPTY_AKT});
+  }:{...EMPTY_AKT,datum_von:parentDatumVon||'',datum_bis:parentDatumBis&&parentDatumBis!==parentDatumVon?parentDatumBis:''});
   const [err,setErr]=useState('');
   const [saving,setSaving]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
@@ -3173,8 +3173,8 @@ function CrmAktivitaetFormModal({initial,onClose,onSave,parentId,parentTitel}){
           </label>
         </div>
         <div className="nfg-form-row">
-          <label className="nfg-label">Datum von<input {...inp} type="date" value={f.datum_von} onChange={e=>set('datum_von',e.target.value)}/></label>
-          <label className="nfg-label">Datum bis<input {...inp} type="date" value={f.datum_bis} onChange={e=>set('datum_bis',e.target.value)}/></label>
+          <label className="nfg-label">Datum von<input {...inp} type="date" value={f.datum_von} min={parentDatumVon||undefined} max={parentDatumBis||parentDatumVon||undefined} onChange={e=>set('datum_von',e.target.value)}/></label>
+          <label className="nfg-label">Datum bis<input {...inp} type="date" value={f.datum_bis} min={parentDatumVon||undefined} max={parentDatumBis||parentDatumVon||undefined} onChange={e=>set('datum_bis',e.target.value)}/></label>
         </div>
         {singleDay()&&<div className="nfg-form-row">
           <label className="nfg-label">Uhrzeit von<input {...inp} type="time" value={f.zeit_von} onChange={e=>set('zeit_von',e.target.value)}/></label>
@@ -3550,7 +3550,7 @@ function CrmAktivitaetDetail({akt,onClose,onEdit,onDelete,onViewSub}){
         </div>
       </div>
     </div>}
-    {newSubModal&&<CrmAktivitaetFormModal initial={null} parentId={akt.id} parentTitel={akt.titel} onClose={()=>setNewSubModal(false)} onSave={handleSubSave}/>}
+    {newSubModal&&<CrmAktivitaetFormModal initial={null} parentId={akt.id} parentTitel={akt.titel} parentDatumVon={akt.datum_von||undefined} parentDatumBis={akt.datum_bis||akt.datum_von||undefined} onClose={()=>setNewSubModal(false)} onSave={handleSubSave}/>}
   </div>;
 }
 
