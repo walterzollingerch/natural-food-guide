@@ -2586,20 +2586,26 @@ function KatBadge({katId,kategorien}) {
   const color=kat.farbe||'#6b7280';
   return <span style={{fontSize:11,fontWeight:700,padding:'2px 9px',borderRadius:999,background:color+'22',color,border:`1.5px solid ${color}55`,whiteSpace:'nowrap'}}>{kat.name}</span>;
 }
+function KatBadges({katIds,kategorien}) {
+  if(!katIds||!katIds.length) return null;
+  return <>{katIds.map(kid=><KatBadge key={kid} katId={kid} kategorien={kategorien}/>)}</>;
+}
 
 const EMPTY_CRM={vorname:'',nachname:'',funktion:'',firma:'',email:'',telefon:'',linkedin:'',social_media:'',kategorie_id:'',unternehmen_id:'',notizen:'',einwilligung:false,einwilligung_datum:''};
 
-function CrmKontaktFormModal({initial,kategorien,unternehmen=[],onClose,onSave}) {
+function CrmKontaktFormModal({initial,kategorien,unternehmen=[],initialKategorieIds=[],onClose,onSave}) {
   const [f,setF]=useState(()=>initial?{
     vorname:initial.vorname||'',nachname:initial.nachname||'',funktion:initial.funktion||'',
     firma:initial.firma||'',email:initial.email||'',telefon:initial.telefon||'',
     linkedin:initial.linkedin||'',social_media:initial.social_media||'',
-    kategorie_id:initial.kategorie_id||'',unternehmen_id:initial.unternehmen_id||'',
+    unternehmen_id:initial.unternehmen_id||'',
     notizen:initial.notizen||'',einwilligung:!!initial.einwilligung,einwilligung_datum:initial.einwilligung_datum||''
   }:{...EMPTY_CRM});
+  const [kategorieIds,setKategorieIds]=useState(initialKategorieIds);
   const [err,setErr]=useState('');
   const [saving,setSaving]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const toggleKat=id=>setKategorieIds(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
 
   const submit=async e=>{
     e.preventDefault(); setErr('');
@@ -2610,10 +2616,10 @@ function CrmKontaktFormModal({initial,kategorien,unternehmen=[],onClose,onSave})
       funktion:f.funktion.trim()||null,firma:f.firma.trim()||null,
       email:f.email.trim()||null,telefon:f.telefon.trim()||null,
       linkedin:f.linkedin.trim()||null,social_media:f.social_media.trim()||null,
-      kategorie_id:f.kategorie_id||null,unternehmen_id:f.unternehmen_id||null,
+      unternehmen_id:f.unternehmen_id||null,
       notizen:f.notizen.trim()||null,einwilligung:f.einwilligung,einwilligung_datum:f.einwilligung_datum||null
     };
-    const errMsg=await onSave(payload,!!initial);
+    const errMsg=await onSave(payload,!!initial,kategorieIds);
     setSaving(false);
     if(errMsg){setErr(errMsg);return;}
     onClose();
@@ -2633,13 +2639,14 @@ function CrmKontaktFormModal({initial,kategorien,unternehmen=[],onClose,onSave})
           <label className="nfg-label">Funktion / Position<input {...inp} value={f.funktion} onChange={e=>set('funktion',e.target.value)} placeholder="Redaktorin"/></label>
           <label className="nfg-label">Firma / Organisation<input {...inp} value={f.firma} onChange={e=>set('firma',e.target.value)} placeholder="NZZ"/></label>
         </div>
-        <div className="nfg-form-row">
-          <label className="nfg-label">Kategorie
-            <select className="nfg-select" style={{width:'100%'}} value={f.kategorie_id} onChange={e=>set('kategorie_id',e.target.value)}>
-              <option value="">— keine —</option>
-              {kategorien.map(k=><option key={k.id} value={k.id}>{k.name}</option>)}
-            </select>
+        <div className="nfg-form-row one">
+          <label className="nfg-label">Kategorien
+            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:6}}>
+              {kategorien.map(k=>{const active=kategorieIds.includes(k.id);const c=k.farbe||'#6b7280';return <label key={k.id} style={{display:'flex',alignItems:'center',gap:5,background:active?c+'22':'transparent',border:`1.5px solid ${active?c:c+'55'}`,borderRadius:999,padding:'4px 12px',cursor:'pointer',fontSize:13,fontWeight:600,color:c}}><input type="checkbox" style={{display:'none'}} checked={active} onChange={()=>toggleKat(k.id)}/>{k.name}</label>;})}
+            </div>
           </label>
+        </div>
+        <div className="nfg-form-row one">
           <label className="nfg-label">Unternehmen
             <select className="nfg-select" style={{width:'100%'}} value={f.unternehmen_id} onChange={e=>set('unternehmen_id',e.target.value)}>
               <option value="">— keines —</option>
@@ -2742,7 +2749,7 @@ function CrmInteraktionFormModal({contactName,onClose,onSave}) {
   </div>;
 }
 
-function CrmKontaktDetail({contact,kategorien,currentUserId,onClose,onEdit,onDelete}) {
+function CrmKontaktDetail({contact,kategorien,kategorieIds=[],currentUserId,onClose,onEdit,onDelete}) {
   const [interaktionen,setInteraktionen]=useState([]);
   const [loading,setLoading]=useState(true);
   const [showIaktForm,setShowIaktForm]=useState(false);
@@ -2773,8 +2780,8 @@ function CrmKontaktDetail({contact,kategorien,currentUserId,onClose,onEdit,onDel
       <div className="nfg-profile-body" style={{paddingTop:28}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,marginBottom:16,flexWrap:'wrap'}}>
           <div>
-            {contact.kategorie_id&&<KatBadge katId={contact.kategorie_id} kategorien={kategorien}/>}
-            <h1 className="nfg-profile-name" style={{marginTop:8,marginBottom:4}}>{contactName}</h1>
+            {kategorieIds.length>0&&<div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:6}}><KatBadges katIds={kategorieIds} kategorien={kategorien}/></div>}
+            <h1 className="nfg-profile-name" style={{marginTop:4,marginBottom:4}}>{contactName}</h1>
             {(contact.funktion||contact.firma||contact.unternehmen_name)&&<div style={{fontSize:14,color:'#666'}}>{[contact.funktion,contact.unternehmen_name||contact.firma].filter(Boolean).join(' · ')}</div>}
           </div>
           <div style={{display:'flex',gap:6,flexShrink:0}}>
@@ -2846,6 +2853,7 @@ function CrmKontaktDetail({contact,kategorien,currentUserId,onClose,onEdit,onDel
 function CrmKontakteTab({events}) {
   const [contacts,setContacts]=useState([]);
   const [kategorien,setKategorien]=useState([]);
+  const [contactKatMap,setContactKatMap]=useState({});
   const [loading,setLoading]=useState(true);
   const [search,setSearch]=useState('');
   const [filterKat,setFilterKat]=useState('');
@@ -2861,8 +2869,15 @@ function CrmKontakteTab({events}) {
   },[]);
 
   const reload=()=>{
-    db.from('crm_contacts_overview').select('*').order('nachname')
-      .then(({data})=>{ setContacts(data||[]); setLoading(false); });
+    Promise.all([
+      db.from('crm_contacts_overview').select('*').order('nachname'),
+      db.from('crm_contact_kategorien').select('contact_id,kategorie_id')
+    ]).then(([{data:c},{data:k}])=>{
+      setContacts(c||[]);
+      const m={};(k||[]).forEach(r=>{(m[r.contact_id]=m[r.contact_id]||[]).push(r.kategorie_id);});
+      setContactKatMap(m);
+      setLoading(false);
+    });
   };
 
   useEffect(()=>{
@@ -2872,19 +2887,25 @@ function CrmKontakteTab({events}) {
   },[]);
 
   const filtered=useMemo(()=>contacts.filter(c=>{
-    if(filterKat&&c.kategorie_id!==filterKat)return false;
+    if(filterKat&&!(contactKatMap[c.id]||[]).includes(filterKat))return false;
     if(search){const q=search.toLowerCase();if(![c.vorname,c.nachname,c.firma,c.funktion,c.email].filter(Boolean).join(' ').toLowerCase().includes(q))return false;}
     return true;
-  }),[contacts,search,filterKat]);
+  }),[contacts,contactKatMap,search,filterKat]);
 
-  const handleSave=async(payload,isEdit)=>{
+  const handleSave=async(payload,isEdit,kategorieIds=[])=>{
     const targetId=isEdit?(detail?.id||formItem?.id):null;
+    let contactId=targetId;
     if(isEdit&&targetId){
       const{error}=await db.from('crm_contacts').update(payload).eq('id',targetId);
       if(error) return error.message;
     }else{
-      const{error}=await db.from('crm_contacts').insert(payload);
+      const{data,error}=await db.from('crm_contacts').insert(payload).select('id').single();
       if(error) return error.message;
+      contactId=data.id;
+    }
+    await db.from('crm_contact_kategorien').delete().eq('contact_id',contactId);
+    if(kategorieIds.length>0){
+      await db.from('crm_contact_kategorien').insert(kategorieIds.map(kid=>({contact_id:contactId,kategorie_id:kid})));
     }
     reload();
     return null;
@@ -2897,12 +2918,11 @@ function CrmKontakteTab({events}) {
     setDetail(null); setDeleting(false); setConfirmDel(null);
   };
 
-  // Stats by category
   const byKat=useMemo(()=>{
     const m={};
-    contacts.forEach(c=>{ if(c.kategorie_id) m[c.kategorie_id]=(m[c.kategorie_id]||0)+1; });
+    Object.values(contactKatMap).forEach(kids=>kids.forEach(k=>{m[k]=(m[k]||0)+1;}));
     return m;
-  },[contacts]);
+  },[contactKatMap]);
 
   return <>
     {/* Summary stats */}
@@ -2939,14 +2959,15 @@ function CrmKontakteTab({events}) {
 
     <div className="nfg-admin-list">
       {filtered.map(c=>{
-        const kat=kategorien.find(k=>k.id===c.kategorie_id);
+        const cKats=contactKatMap[c.id]||[];
+        const firstKat=kategorien.find(k=>k.id===cKats[0]);
         const initials=(c.vorname.charAt(0)+c.nachname.charAt(0)).toUpperCase();
         return <div key={c.id} className="nfg-admin-item" style={{cursor:'pointer'}} onClick={()=>setDetail(c)}>
-          <div className="nfg-avatar" style={{width:38,height:38,fontSize:13,flexShrink:0,background:kat?.farbe||'#6b7280',color:'#fff'}}>{initials}</div>
+          <div className="nfg-avatar" style={{width:38,height:38,fontSize:13,flexShrink:0,background:firstKat?.farbe||'#6b7280',color:'#fff'}}>{initials}</div>
           <div className="nfg-admin-info">
             <div className="nfg-admin-name" style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
               {c.vorname} {c.nachname}
-              {c.kategorie_id&&<KatBadge katId={c.kategorie_id} kategorien={kategorien}/>}
+              <KatBadges katIds={cKats} kategorien={kategorien}/>
               {!c.einwilligung&&<span style={{fontSize:10,color:'#b45309',background:'#fef3c7',borderRadius:4,padding:'1px 6px',fontWeight:700}}>⚠ DSG</span>}
             </div>
             <div className="nfg-admin-meta">
@@ -2962,10 +2983,10 @@ function CrmKontakteTab({events}) {
       })}
     </div>
 
-    {formItem!==null&&<CrmKontaktFormModal initial={formItem||null} kategorien={kategorien} unternehmen={unternehmen} onClose={()=>setFormItem(null)} onSave={handleSave}/>}
+    {formItem!==null&&<CrmKontaktFormModal initial={formItem||null} kategorien={kategorien} unternehmen={unternehmen} initialKategorieIds={formItem?(contactKatMap[formItem.id]||[]):[]} onClose={()=>setFormItem(null)} onSave={handleSave}/>}
 
     {detail&&<CrmKontaktDetail
-      contact={detail} kategorien={kategorien} currentUserId={currentUserId}
+      contact={detail} kategorien={kategorien} kategorieIds={contactKatMap[detail.id]||[]} currentUserId={currentUserId}
       onClose={()=>setDetail(null)}
       onEdit={c=>{setDetail(null);setFormItem(c);}}
       onDelete={c=>{setDetail(null);setConfirmDel(c);}}
@@ -3102,23 +3123,28 @@ function CrmUnternehmenFormModal({initial,branchen,onClose,onSave}){
 }
 
 // ── CRM Aktivität Form Modal ───────────────────────────────────
-const EMPTY_AKT={titel:'',typ:'event',beschreibung:'',datum_von:'',datum_bis:'',ort:'',status:'geplant',notizen:''};
-function CrmAktivitaetFormModal({initial,onClose,onSave}){
+const EMPTY_AKT={titel:'',typ:'event',beschreibung:'',datum_von:'',datum_bis:'',ort:'',status:'geplant',notizen:'',zeit_von:'',zeit_bis:''};
+function CrmAktivitaetFormModal({initial,onClose,onSave,parentId,parentTitel}){
   const [f,setF]=useState(()=>initial?{
     titel:initial.titel||'',typ:initial.typ||'event',beschreibung:initial.beschreibung||'',
     datum_von:initial.datum_von||'',datum_bis:initial.datum_bis||'',ort:initial.ort||'',
-    status:initial.status||'geplant',notizen:initial.notizen||''
+    status:initial.status||'geplant',notizen:initial.notizen||'',
+    zeit_von:initial.zeit_von||'',zeit_bis:initial.zeit_bis||''
   }:{...EMPTY_AKT});
   const [err,setErr]=useState('');
   const [saving,setSaving]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const singleDay=()=>f.datum_von&&(!f.datum_bis||f.datum_bis===f.datum_von);
   const submit=async e=>{
     e.preventDefault(); setErr('');
     if(!f.titel.trim()){setErr('Titel ist erforderlich.');return;}
     setSaving(true);
+    const sd=singleDay();
     const payload={titel:f.titel.trim(),typ:f.typ,beschreibung:f.beschreibung.trim()||null,
       datum_von:f.datum_von||null,datum_bis:f.datum_bis||null,ort:f.ort.trim()||null,
-      status:f.status,notizen:f.notizen.trim()||null};
+      status:f.status,notizen:f.notizen.trim()||null,
+      zeit_von:sd&&f.zeit_von?f.zeit_von:null,zeit_bis:sd&&f.zeit_bis?f.zeit_bis:null,
+      parent_id:parentId||(initial?.parent_id||null)};
     const errMsg=await onSave(payload,!!initial);
     setSaving(false);
     if(errMsg){setErr(errMsg);return;}
@@ -3128,8 +3154,9 @@ function CrmAktivitaetFormModal({initial,onClose,onSave}){
   return <div className="nfg-form-overlay" onClick={e=>e.target.classList.contains('nfg-form-overlay')&&onClose()}>
     <div className="nfg-form-sheet" style={{maxWidth:560}}>
       <button className="nfg-form-close" onClick={onClose}>×</button>
-      <h2 className="nfg-form-title">{initial?'Aktivität bearbeiten':'Neue Aktivität'}</h2>
+      <h2 className="nfg-form-title">{initial?'Aktivität bearbeiten':parentTitel?'Neue Unteraktivität':'Neue Aktivität'}</h2>
       <form onSubmit={submit}>
+        {parentTitel&&<div style={{fontSize:12,color:'#666',marginBottom:12,padding:'8px 12px',background:'#f9fafb',borderRadius:8,border:'1px solid var(--nfg-line)'}}>↳ Unteraktivität von: <strong>{parentTitel}</strong></div>}
         <div className="nfg-form-row one">
           <label className="nfg-label">Titel *<input {...inp} value={f.titel} onChange={e=>set('titel',e.target.value)} required placeholder="Bodenfest 2026"/></label>
         </div>
@@ -3149,6 +3176,10 @@ function CrmAktivitaetFormModal({initial,onClose,onSave}){
           <label className="nfg-label">Datum von<input {...inp} type="date" value={f.datum_von} onChange={e=>set('datum_von',e.target.value)}/></label>
           <label className="nfg-label">Datum bis<input {...inp} type="date" value={f.datum_bis} onChange={e=>set('datum_bis',e.target.value)}/></label>
         </div>
+        {singleDay()&&<div className="nfg-form-row">
+          <label className="nfg-label">Uhrzeit von<input {...inp} type="time" value={f.zeit_von} onChange={e=>set('zeit_von',e.target.value)}/></label>
+          <label className="nfg-label">Uhrzeit bis<input {...inp} type="time" value={f.zeit_bis} onChange={e=>set('zeit_bis',e.target.value)}/></label>
+        </div>}
         <div className="nfg-form-row one">
           <label className="nfg-label">Ort<input {...inp} value={f.ort} onChange={e=>set('ort',e.target.value)} placeholder="Zürich"/></label>
         </div>
@@ -3160,7 +3191,7 @@ function CrmAktivitaetFormModal({initial,onClose,onSave}){
         </div>
         {err&&<p className="nfg-err">{err}</p>}
         <div className="nfg-form-actions">
-          <button className="nfg-btn-primary" type="submit" disabled={saving}>{saving?'Speichern…':initial?'Speichern':'Aktivität erstellen'}</button>
+          <button className="nfg-btn-primary" type="submit" disabled={saving}>{saving?'Speichern…':initial?'Speichern':parentTitel?'Unteraktivität erstellen':'Aktivität erstellen'}</button>
           <button className="nfg-btn-ghost" type="button" onClick={onClose}>Abbrechen</button>
         </div>
       </form>
@@ -3304,37 +3335,87 @@ function CrmUnternehmenDetail({unt,onClose,onEdit,onDelete}){
 }
 
 // ── CRM Aktivität Detail ───────────────────────────────────────
-function CrmAktivitaetDetail({akt,onClose,onEdit,onDelete}){
+function CrmAktivitaetDetail({akt,onClose,onEdit,onDelete,onViewSub}){
   const [teilnehmer,setTeilnehmer]=useState([]);
+  const [kontakte,setKontakte]=useState([]);
+  const [subAkt,setSubAkt]=useState([]);
   const [allUnt,setAllUnt]=useState([]);
+  const [allKontakte,setAllKontakte]=useState([]);
+  const [parentAkt,setParentAkt]=useState(null);
   const [loading,setLoading]=useState(true);
   const [addingUnt,setAddingUnt]=useState(false);
   const [newUntId,setNewUntId]=useState('');
   const [newUntRolle,setNewUntRolle]=useState('');
+  const [addingKontakt,setAddingKontakt]=useState(false);
+  const [newKontaktId,setNewKontaktId]=useState('');
+  const [newKontaktRolle,setNewKontaktRolle]=useState('');
   const [confirmDel,setConfirmDel]=useState(false);
+  const [newSubModal,setNewSubModal]=useState(false);
   const typ=AKT_TYP[akt.typ]||AKT_TYP.sonstiges;
+  const singleDay=akt.datum_von&&(!akt.datum_bis||akt.datum_bis===akt.datum_von);
 
   const reload=useCallback(()=>{
     Promise.all([
       db.from('crm_unternehmen_aktivitaeten').select('*,crm_unternehmen(*)').eq('aktivitaet_id',akt.id),
-      db.from('crm_unternehmen').select('id,name,branche').order('name')
-    ]).then(([{data:t},{data:u}])=>{ setTeilnehmer(t||[]); setAllUnt(u||[]); setLoading(false); });
+      db.from('crm_contacts_aktivitaeten').select('*,crm_contacts(id,vorname,nachname,funktion,firma)').eq('aktivitaet_id',akt.id),
+      db.from('crm_aktivitaeten').select('*').eq('parent_id',akt.id).order('datum_von'),
+      db.from('crm_unternehmen').select('id,name,branche').order('name'),
+      db.from('crm_contacts').select('id,vorname,nachname,funktion,firma').order('nachname')
+    ]).then(([{data:t},{data:k},{data:sub},{data:u},{data:c}])=>{
+      setTeilnehmer(t||[]); setKontakte(k||[]); setSubAkt(sub||[]);
+      setAllUnt(u||[]); setAllKontakte(c||[]); setLoading(false);
+    });
   },[akt.id]);
 
   useEffect(()=>{ reload(); },[reload]);
+  useEffect(()=>{
+    if(akt.parent_id) db.from('crm_aktivitaeten').select('id,titel').eq('id',akt.parent_id).single().then(({data})=>setParentAkt(data));
+  },[akt.parent_id]);
 
   const handleAddUnt=async()=>{
     if(!newUntId) return;
-    const{error}=await db.from('crm_unternehmen_aktivitaeten').insert({unternehmen_id:newUntId,aktivitaet_id:akt.id,rolle:newUntRolle.trim()||null});
-    if(!error){ setAddingUnt(false); setNewUntId(''); setNewUntRolle(''); reload(); }
+    await db.from('crm_unternehmen_aktivitaeten').insert({unternehmen_id:newUntId,aktivitaet_id:akt.id,rolle:newUntRolle.trim()||null});
+    if(akt.parent_id) await db.from('crm_unternehmen_aktivitaeten').upsert({unternehmen_id:newUntId,aktivitaet_id:akt.parent_id},{onConflict:'aktivitaet_id,unternehmen_id',ignoreDuplicates:true});
+    setAddingUnt(false); setNewUntId(''); setNewUntRolle(''); reload();
   };
   const handleRemoveUnt=async(untId)=>{
     await db.from('crm_unternehmen_aktivitaeten').delete().eq('aktivitaet_id',akt.id).eq('unternehmen_id',untId);
+    if(akt.parent_id){
+      const{data:sibs}=await db.from('crm_aktivitaeten').select('id').eq('parent_id',akt.parent_id).neq('id',akt.id);
+      const sibIds=(sibs||[]).map(s=>s.id);
+      const stillLinked=sibIds.length>0&&(await db.from('crm_unternehmen_aktivitaeten').select('id').in('aktivitaet_id',sibIds).eq('unternehmen_id',untId)).data?.length>0;
+      if(!stillLinked) await db.from('crm_unternehmen_aktivitaeten').delete().eq('aktivitaet_id',akt.parent_id).eq('unternehmen_id',untId);
+    }
     reload();
   };
 
-  const assigned=new Set(teilnehmer.map(t=>t.unternehmen_id));
-  const available=allUnt.filter(u=>!assigned.has(u.id));
+  const handleAddKontakt=async()=>{
+    if(!newKontaktId) return;
+    await db.from('crm_contacts_aktivitaeten').insert({contact_id:newKontaktId,aktivitaet_id:akt.id,rolle:newKontaktRolle.trim()||null});
+    if(akt.parent_id) await db.from('crm_contacts_aktivitaeten').upsert({contact_id:newKontaktId,aktivitaet_id:akt.parent_id},{onConflict:'contact_id,aktivitaet_id',ignoreDuplicates:true});
+    setAddingKontakt(false); setNewKontaktId(''); setNewKontaktRolle(''); reload();
+  };
+  const handleRemoveKontakt=async(kontaktId)=>{
+    await db.from('crm_contacts_aktivitaeten').delete().eq('aktivitaet_id',akt.id).eq('contact_id',kontaktId);
+    if(akt.parent_id){
+      const{data:sibs}=await db.from('crm_aktivitaeten').select('id').eq('parent_id',akt.parent_id).neq('id',akt.id);
+      const sibIds=(sibs||[]).map(s=>s.id);
+      const stillLinked=sibIds.length>0&&(await db.from('crm_contacts_aktivitaeten').select('id').in('aktivitaet_id',sibIds).eq('contact_id',kontaktId)).data?.length>0;
+      if(!stillLinked) await db.from('crm_contacts_aktivitaeten').delete().eq('aktivitaet_id',akt.parent_id).eq('contact_id',kontaktId);
+    }
+    reload();
+  };
+
+  const handleSubSave=async(payload)=>{
+    const{error}=await db.from('crm_aktivitaeten').insert(payload);
+    if(error) return error.message;
+    reload(); return null;
+  };
+
+  const assignedUnt=new Set(teilnehmer.map(t=>t.unternehmen_id));
+  const availableUnt=allUnt.filter(u=>!assignedUnt.has(u.id));
+  const assignedKontakt=new Set(kontakte.map(k=>k.contact_id));
+  const availableKontakte=allKontakte.filter(c=>!assignedKontakt.has(c.id));
 
   return <div className="nfg-profile" onClick={e=>e.target.classList.contains('nfg-profile')&&onClose()}>
     <div className="nfg-profile-sheet">
@@ -3342,6 +3423,7 @@ function CrmAktivitaetDetail({akt,onClose,onEdit,onDelete}){
       <div className="nfg-profile-body" style={{paddingTop:28}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,marginBottom:20,flexWrap:'wrap'}}>
           <div>
+            {akt.parent_id&&parentAkt&&<div style={{fontSize:12,color:'#888',marginBottom:6}}>↳ Unteraktivität von <strong>{parentAkt.titel}</strong></div>}
             <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:6}}>
               <span style={{fontSize:22}}>{typ.icon}</span>
               <span style={{fontSize:12,fontWeight:700,color:typ.color,textTransform:'uppercase',letterSpacing:'0.06em'}}>{typ.label}</span>
@@ -3349,7 +3431,8 @@ function CrmAktivitaetDetail({akt,onClose,onEdit,onDelete}){
             </div>
             <h1 className="nfg-profile-name" style={{marginTop:0,marginBottom:4}}>{akt.titel}</h1>
             <div style={{fontSize:13,color:'#666',display:'flex',gap:12,flexWrap:'wrap'}}>
-              {akt.datum_von&&<span>📅 {fmtDate(akt.datum_von)}{akt.datum_bis&&akt.datum_bis!==akt.datum_von?` – ${fmtDate(akt.datum_bis)}`:''}</span>}
+              {akt.datum_von&&<span>📅 {fmtDate(akt.datum_von)}{akt.datum_bis&&akt.datum_bis!==akt.datum_von?` – ${fmtDate(akt.datum_bis)}`:''}{singleDay&&akt.zeit_von?` · ${akt.zeit_von.slice(0,5)}${akt.zeit_bis?`–${akt.zeit_bis.slice(0,5)}`:''}`:''}
+              </span>}
               {akt.ort&&<span>📍 {akt.ort}</span>}
             </div>
           </div>
@@ -3364,17 +3447,39 @@ function CrmAktivitaetDetail({akt,onClose,onEdit,onDelete}){
           <p style={{fontSize:13,lineHeight:1.6,color:'#444',margin:0,whiteSpace:'pre-wrap'}}>{akt.beschreibung}</p>
         </section>}
 
+        {!akt.parent_id&&<section className="nfg-section">
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <h3 className="nfg-section-h" style={{margin:0}}>Unteraktivitäten ({subAkt.length})</h3>
+            <button className="nfg-btn-primary" style={{padding:'6px 12px',fontSize:12}} onClick={()=>setNewSubModal(true)}>+ Unteraktivität</button>
+          </div>
+          {!loading&&subAkt.length===0&&<div className="nfg-empty" style={{padding:'14px',fontSize:13}}>Noch keine Unteraktivitäten.</div>}
+          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {subAkt.map(sub=>{
+              const styp=AKT_TYP[sub.typ]||AKT_TYP.sonstiges;
+              return <div key={sub.id} style={{background:'#fff',border:'1px solid var(--nfg-line)',borderRadius:10,padding:'10px 14px',display:'flex',gap:10,alignItems:'center',cursor:onViewSub?'pointer':'default'}} onClick={()=>onViewSub&&onViewSub(sub)}>
+                <span style={{fontSize:16,flexShrink:0}}>{styp.icon}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:13}}>{sub.titel}</div>
+                  {(sub.datum_von||sub.ort)&&<div style={{fontSize:11,color:'#888',marginTop:2}}>{sub.datum_von&&fmtDate(sub.datum_von)}{sub.zeit_von&&` · ${sub.zeit_von.slice(0,5)}`}{sub.zeit_bis&&`–${sub.zeit_bis.slice(0,5)}`}{sub.ort&&` · ${sub.ort}`}</div>}
+                </div>
+                <AktBadge status={sub.status}/>
+                {onViewSub&&<span style={{color:'#ccc',fontSize:20,lineHeight:1}}>›</span>}
+              </div>;
+            })}
+          </div>
+        </section>}
+
         <section className="nfg-section">
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-            <h3 className="nfg-section-h" style={{margin:0}}>Teilnehmende Unternehmen ({teilnehmer.length})</h3>
-            {!addingUnt&&available.length>0&&<button className="nfg-btn-primary" style={{padding:'6px 12px',fontSize:12}} onClick={()=>setAddingUnt(true)}>+ Unternehmen</button>}
+            <h3 className="nfg-section-h" style={{margin:0}}>Unternehmen ({teilnehmer.length}){akt.parent_id&&<span style={{fontSize:11,color:'#888',fontWeight:400,marginLeft:6}}>· wird auch Mutteraktivität zugewiesen</span>}</h3>
+            {!addingUnt&&availableUnt.length>0&&<button className="nfg-btn-primary" style={{padding:'6px 12px',fontSize:12}} onClick={()=>setAddingUnt(true)}>+ Unternehmen</button>}
           </div>
           {addingUnt&&<div style={{background:'#f9fafb',border:'1px solid var(--nfg-line)',borderRadius:10,padding:'12px',marginBottom:12,display:'flex',flexDirection:'column',gap:8}}>
             <select className="nfg-select" value={newUntId} onChange={e=>setNewUntId(e.target.value)} style={{width:'100%'}}>
               <option value="">— Unternehmen wählen —</option>
-              {available.map(u=><option key={u.id} value={u.id}>{u.name}{u.branche?` · ${u.branche}`:''}</option>)}
+              {availableUnt.map(u=><option key={u.id} value={u.id}>{u.name}{u.branche?` · ${u.branche}`:''}</option>)}
             </select>
-            <input className="nfg-input" value={newUntRolle} onChange={e=>setNewUntRolle(e.target.value)} placeholder="Rolle (z.B. Sponsor, Teilnehmer) — optional"/>
+            <input className="nfg-input" value={newUntRolle} onChange={e=>setNewUntRolle(e.target.value)} placeholder="Rolle (z.B. Sponsor) — optional"/>
             <div style={{display:'flex',gap:8}}>
               <button className="nfg-btn-primary" style={{padding:'7px 14px',fontSize:12}} disabled={!newUntId} onClick={handleAddUnt}>Hinzufügen</button>
               <button className="nfg-btn-ghost" style={{padding:'7px 14px',fontSize:12}} onClick={()=>{setAddingUnt(false);setNewUntId('');setNewUntRolle('');}}>Abbrechen</button>
@@ -3388,12 +3493,41 @@ function CrmAktivitaetDetail({akt,onClose,onEdit,onDelete}){
                 <span style={{fontSize:16,flexShrink:0}}>🏢</span>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:700,fontSize:13}}>{u.name}</div>
-                  {(u.branche||t.rolle)&&<div style={{fontSize:11,color:'#888',marginTop:2}}>
-                    {u.branche&&<span>{u.branche}</span>}
-                    {t.rolle&&<span style={{fontWeight:700,color:'#444'}}>{u.branche?' · ':''}{t.rolle}</span>}
-                  </div>}
+                  {(u.branche||t.rolle)&&<div style={{fontSize:11,color:'#888',marginTop:2}}>{u.branche&&<span>{u.branche}</span>}{t.rolle&&<span style={{fontWeight:700,color:'#444'}}>{u.branche?' · ':''}{t.rolle}</span>}</div>}
                 </div>
                 <button style={{border:'none',background:'none',cursor:'pointer',fontSize:16,color:'#ccc',padding:'0 4px'}} onClick={()=>handleRemoveUnt(t.unternehmen_id)}>×</button>
+              </div>;
+            })}
+          </div>
+        </section>
+
+        <section className="nfg-section">
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <h3 className="nfg-section-h" style={{margin:0}}>Kontakte ({kontakte.length}){akt.parent_id&&<span style={{fontSize:11,color:'#888',fontWeight:400,marginLeft:6}}>· wird auch Mutteraktivität zugewiesen</span>}</h3>
+            {!addingKontakt&&availableKontakte.length>0&&<button className="nfg-btn-primary" style={{padding:'6px 12px',fontSize:12}} onClick={()=>setAddingKontakt(true)}>+ Kontakt</button>}
+          </div>
+          {addingKontakt&&<div style={{background:'#f9fafb',border:'1px solid var(--nfg-line)',borderRadius:10,padding:'12px',marginBottom:12,display:'flex',flexDirection:'column',gap:8}}>
+            <select className="nfg-select" value={newKontaktId} onChange={e=>setNewKontaktId(e.target.value)} style={{width:'100%'}}>
+              <option value="">— Kontakt wählen —</option>
+              {availableKontakte.map(c=><option key={c.id} value={c.id}>{c.vorname} {c.nachname}{c.firma?` · ${c.firma}`:''}</option>)}
+            </select>
+            <input className="nfg-input" value={newKontaktRolle} onChange={e=>setNewKontaktRolle(e.target.value)} placeholder="Rolle (z.B. Referent) — optional"/>
+            <div style={{display:'flex',gap:8}}>
+              <button className="nfg-btn-primary" style={{padding:'7px 14px',fontSize:12}} disabled={!newKontaktId} onClick={handleAddKontakt}>Hinzufügen</button>
+              <button className="nfg-btn-ghost" style={{padding:'7px 14px',fontSize:12}} onClick={()=>{setAddingKontakt(false);setNewKontaktId('');setNewKontaktRolle('');}}>Abbrechen</button>
+            </div>
+          </div>}
+          {!loading&&kontakte.length===0&&!addingKontakt&&<div className="nfg-empty" style={{padding:'14px',fontSize:13}}>Noch keine Kontakte verknüpft.</div>}
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {kontakte.map(ka=>{
+              const c=ka.crm_contacts; if(!c) return null;
+              return <div key={ka.contact_id} style={{background:'#fff',border:'1px solid var(--nfg-line)',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:10}}>
+                <span style={{fontSize:16,flexShrink:0}}>👤</span>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:13}}>{c.vorname} {c.nachname}</div>
+                  {(c.funktion||c.firma||ka.rolle)&&<div style={{fontSize:11,color:'#888',marginTop:2}}>{[c.funktion||c.firma,ka.rolle&&`· ${ka.rolle}`].filter(Boolean).join(' ')}</div>}
+                </div>
+                <button style={{border:'none',background:'none',cursor:'pointer',fontSize:16,color:'#ccc',padding:'0 4px'}} onClick={()=>handleRemoveKontakt(ka.contact_id)}>×</button>
               </div>;
             })}
           </div>
@@ -3416,6 +3550,7 @@ function CrmAktivitaetDetail({akt,onClose,onEdit,onDelete}){
         </div>
       </div>
     </div>}
+    {newSubModal&&<CrmAktivitaetFormModal initial={null} parentId={akt.id} parentTitel={akt.titel} onClose={()=>setNewSubModal(false)} onSave={handleSubSave}/>}
   </div>;
 }
 
@@ -3749,9 +3884,10 @@ function CrmAktivitaetenTab(){
   const [filterTyp,setFilterTyp]=useState('');
   const [formItem,setFormItem]=useState(null);
   const [detail,setDetail]=useState(null);
+  const [expanded,setExpanded]=useState(new Set());
 
   const reload=()=>{
-    db.from('crm_aktivitaeten').select('*').order('datum_von',{ascending:false,nullsFirst:false})
+    db.from('crm_aktivitaeten').select('*').order('datum_von',{ascending:true,nullsFirst:false})
       .then(({data})=>{ setList(data||[]); setLoading(false); });
   };
   useEffect(()=>{ reload(); },[]);
@@ -3771,20 +3907,58 @@ function CrmAktivitaetenTab(){
     setList(prev=>prev.filter(x=>x.id!==a.id)); setDetail(null);
   };
 
-  const filtered=useMemo(()=>list.filter(a=>{
+  const parents=useMemo(()=>list.filter(a=>!a.parent_id),[list]);
+  const childrenByParent=useMemo(()=>{
+    const m={};
+    list.filter(a=>a.parent_id).forEach(a=>{ if(!m[a.parent_id]) m[a.parent_id]=[]; m[a.parent_id].push(a); });
+    return m;
+  },[list]);
+
+  const filteredParents=useMemo(()=>parents.filter(a=>{
     if(filterTyp&&a.typ!==filterTyp) return false;
     if(search){const q=search.toLowerCase();if(![a.titel,a.ort,a.beschreibung].filter(Boolean).join(' ').toLowerCase().includes(q))return false;}
     return true;
-  }),[list,search,filterTyp]);
+  }),[parents,search,filterTyp]);
+
+  const toggleExpand=(id,e)=>{e.stopPropagation();setExpanded(prev=>{const s=new Set(prev);s.has(id)?s.delete(id):s.add(id);return s;});};
+
+  const renderItem=(a,indent)=>{
+    const typ=AKT_TYP[a.typ]||AKT_TYP.sonstiges;
+    const childs=childrenByParent[a.id]||[];
+    const isExp=expanded.has(a.id);
+    const singleDay=a.datum_von&&(!a.datum_bis||a.datum_bis===a.datum_von);
+    return <React.Fragment key={a.id}>
+      <div className="nfg-admin-item" style={{cursor:'pointer',paddingLeft:indent?44:undefined,background:indent?'#fafafa':undefined}} onClick={()=>setDetail(a)}>
+        {!indent&&childs.length>0
+          ?<button style={{border:'none',background:'none',cursor:'pointer',fontSize:13,width:22,height:22,display:'flex',alignItems:'center',justifyContent:'center',color:'#999',padding:0,flexShrink:0}} onClick={e=>toggleExpand(a.id,e)}>{isExp?'▾':'▸'}</button>
+          :<span style={{width:22,flexShrink:0,display:'inline-block'}}/>
+        }
+        <div style={{width:indent?30:38,height:indent?30:38,borderRadius:10,background:typ.color+'18',display:'flex',alignItems:'center',justifyContent:'center',fontSize:indent?14:18,flexShrink:0}}>{typ.icon}</div>
+        <div className="nfg-admin-info">
+          <div className="nfg-admin-name" style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',fontSize:indent?13:undefined}}>
+            {indent&&<span style={{color:'#bbb',fontSize:12}}>↳</span>}
+            {a.titel}
+            <AktBadge status={a.status}/>
+            {!indent&&childs.length>0&&<span style={{fontSize:11,color:'#aaa',fontWeight:400}}>({childs.length})</span>}
+          </div>
+          <div className="nfg-admin-meta">{[typ.label,a.ort].filter(Boolean).join(' · ')}</div>
+        </div>
+        {a.datum_von&&<span style={{fontSize:11,color:'#888',flexShrink:0,textAlign:'right',lineHeight:1.4}}>
+          {fmtDate(a.datum_von)}{singleDay&&a.zeit_von?<><br/><span style={{color:'#aaa'}}>{a.zeit_von.slice(0,5)}{a.zeit_bis?`–${a.zeit_bis.slice(0,5)}`:''}</span></>:''}
+        </span>}
+      </div>
+      {!indent&&isExp&&childs.map(sub=>renderItem(sub,true))}
+    </React.Fragment>;
+  };
 
   return <>
     <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:20}}>
       <div style={{background:'#fff',border:'1px solid var(--nfg-line)',borderRadius:12,padding:'12px 18px',textAlign:'center',minWidth:90}}>
-        <div style={{fontSize:26,fontWeight:700}}>{list.length}</div>
+        <div style={{fontSize:26,fontWeight:700}}>{parents.length}</div>
         <div style={{fontSize:11,fontWeight:700,color:'#666',textTransform:'uppercase',letterSpacing:'0.04em'}}>Aktivitäten</div>
       </div>
       {Object.entries(AKT_TYP).map(([k,v])=>{
-        const n=list.filter(a=>a.typ===k).length; if(!n) return null;
+        const n=parents.filter(a=>a.typ===k).length; if(!n) return null;
         return <div key={k} style={{background:v.color+'15',border:`1.5px solid ${v.color}40`,borderRadius:12,padding:'12px 18px',textAlign:'center',minWidth:80}}>
           <div style={{fontSize:22,fontWeight:700,color:v.color}}>{n}</div>
           <div style={{fontSize:11,fontWeight:700,color:v.color,textTransform:'uppercase',letterSpacing:'0.04em'}}>{v.label}</div>
@@ -3805,25 +3979,12 @@ function CrmAktivitaetenTab(){
       <button className="nfg-btn-primary" onClick={()=>setFormItem(false)}>+ Neue Aktivität</button>
     </div>
     {loading&&<div style={{padding:'32px 0',textAlign:'center',color:'#666'}}>Laden…</div>}
-    {!loading&&filtered.length===0&&<div className="nfg-empty">{list.length===0?'Noch keine Aktivitäten. Erstelle die erste.':'Keine Treffer.'}</div>}
+    {!loading&&filteredParents.length===0&&<div className="nfg-empty">{parents.length===0?'Noch keine Aktivitäten. Erstelle die erste.':'Keine Treffer.'}</div>}
     <div className="nfg-admin-list">
-      {filtered.map(a=>{
-        const typ=AKT_TYP[a.typ]||AKT_TYP.sonstiges;
-        return <div key={a.id} className="nfg-admin-item" style={{cursor:'pointer'}} onClick={()=>setDetail(a)}>
-          <div style={{width:38,height:38,borderRadius:10,background:typ.color+'18',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>{typ.icon}</div>
-          <div className="nfg-admin-info">
-            <div className="nfg-admin-name" style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-              {a.titel}
-              <AktBadge status={a.status}/>
-            </div>
-            <div className="nfg-admin-meta">{[typ.label,a.ort].filter(Boolean).join(' · ')}</div>
-          </div>
-          {a.datum_von&&<span style={{fontSize:11,color:'#888',flexShrink:0}}>{fmtDate(a.datum_von)}</span>}
-        </div>;
-      })}
+      {filteredParents.map(a=>renderItem(a,false))}
     </div>
     {formItem!==null&&<CrmAktivitaetFormModal initial={formItem||null} onClose={()=>setFormItem(null)} onSave={handleSave}/>}
-    {detail&&<CrmAktivitaetDetail akt={detail} onClose={()=>setDetail(null)} onEdit={a=>{setDetail(null);setFormItem(a);}} onDelete={handleDelete}/>}
+    {detail&&<CrmAktivitaetDetail akt={detail} onClose={()=>setDetail(null)} onEdit={a=>{setDetail(null);setFormItem(a);}} onDelete={handleDelete} onViewSub={sub=>setDetail(sub)}/>}
   </>;
 }
 
