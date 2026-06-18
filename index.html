@@ -3558,7 +3558,7 @@ function CrmKategorienTab(){
       const{error}=await db.from('crm_kategorien').update({name:f.name.trim(),farbe:f.farbe}).eq('id',editItem.id);
       if(error){setErr(error.message);setSaving(false);return;}
     } else {
-      const{error}=await db.from('crm_kategorien').insert({name:f.name.trim(),farbe:f.farbe,sort_order:list.length});
+      const{error}=await db.from('crm_kategorien').insert({id:crypto.randomUUID(),name:f.name.trim(),farbe:f.farbe,sort_order:list.length});
       if(error){setErr(error.message);setSaving(false);return;}
     }
     setSaving(false); setEditItem(null); reload();
